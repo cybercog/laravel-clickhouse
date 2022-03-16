@@ -1,16 +1,16 @@
 {
     "name": "cybercog/laravel-clickhouse-migrations",
-    "description": "Clickhouse migrations for Laravel",
+    "description": "ClickHouse migrations for Laravel",
     "type": "library",
     "license": "MIT",
     "keywords": [
         "cybercog",
         "cog",
-        "clickhouse",
-        "migration",
+        "laravel",
         "database",
         "db",
-        "laravel"
+        "clickhouse",
+        "migration"
     ],
     "authors": [
         {

@@ -11,12 +11,12 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations;
+namespace Cog\Laravel\ClickhouseMigrations\Factory;
 
 use ClickHouseDB\Client;
-use Cog\Laravel\ClickhouseMigrations\Exceptions\ClickhouseConfigException;
+use Cog\Laravel\ClickhouseMigrations\Exception\ClickhouseConfigException;
 
-final class ClickhouseFactory
+final class ClickhouseClientFactory
 {
     private array $defaultConfig;
 
@@ -52,17 +52,29 @@ final class ClickhouseFactory
         $client = new Client($config);
 
         foreach ($options as $option => $value) {
-            if (method_exists($client, $option)) {
-                $method = $option;
-            } elseif (method_exists($client, 'set' . ucwords($option))) {
-                $method = 'set' . ucwords($option);
-            } else {
-                throw new ClickhouseConfigException("Unknown ClickHouse DB option {$option}");
-            }
+            $method = $this->resolveOptionMutatorMethod($client, $option);
 
             $client->$method($value);
         }
 
         return $client;
+    }
+
+    /**
+     * @throws ClickhouseConfigException
+     */
+    private function resolveOptionMutatorMethod(
+        Client $client,
+        string $option
+    ): string {
+        if (method_exists($client, $option)) {
+            return $option;
+        }
+
+        if (method_exists($client, 'set' . ucwords($option))) {
+            return 'set' . ucwords($option);
+        }
+
+        throw new ClickhouseConfigException("Unknown ClickHouse DB option {$option}");
     }
 }

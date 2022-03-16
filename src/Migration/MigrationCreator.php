@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\Migrations;
+namespace Cog\Laravel\ClickhouseMigrations\Migration;
 
 use Illuminate\Filesystem\Filesystem;
 
@@ -19,14 +19,14 @@ class MigrationCreator
 {
     protected Filesystem $filesystem;
 
-    private ?string $customStubFilePath;
+    private ?string $migrationStubFilePath;
 
     public function __construct(
         Filesystem $filesystem,
-        ?string $customStubPath
+        ?string $migrationStubFilePath
     ) {
         $this->filesystem = $filesystem;
-        $this->customStubFilePath = $customStubPath;
+        $this->migrationStubFilePath = $migrationStubFilePath;
     }
 
     public function create(
@@ -62,7 +62,7 @@ class MigrationCreator
     protected function getStubFileContent(): string
     {
         $stubFileName = 'clickhouse-migration.stub';
-        $customStubFilePath = $this->customStubFilePath . '/' . $stubFileName;
+        $customStubFilePath = $this->migrationStubFilePath . '/' . $stubFileName;
 
         $stub = $this->filesystem->exists($customStubFilePath)
             ? $customStubFilePath

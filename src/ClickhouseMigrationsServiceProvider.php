@@ -14,15 +14,16 @@ declare(strict_types=1);
 namespace Cog\Laravel\ClickhouseMigrations;
 
 use ClickHouseDB\Client as ClickhouseClient;
+use Cog\Laravel\ClickhouseMigrations\ConsoleCommand\ClickhouseMigrationsMigrateCommand;
+use Cog\Laravel\ClickhouseMigrations\ConsoleCommand\MakeClickhouseMigrationCommand;
+use Cog\Laravel\ClickhouseMigrations\Factory\ClickhouseClientFactory;
+use Cog\Laravel\ClickhouseMigrations\Migration\MigrationCreator;
+use Cog\Laravel\ClickhouseMigrations\Migration\MigrationRepository;
+use Cog\Laravel\ClickhouseMigrations\Migration\Migrator;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
-use Cog\Laravel\ClickhouseMigrations\Migrations\Migrator;
-use Cog\Laravel\ClickhouseMigrations\Commands\ClickhouseMigrationsMigrateCommand;
-use Cog\Laravel\ClickhouseMigrations\Commands\MakeClickhouseMigrationCommand;
-use Cog\Laravel\ClickhouseMigrations\Migrations\MigrationCreator;
-use Cog\Laravel\ClickhouseMigrations\Migrations\MigrationRepository;
 
 final class ClickhouseMigrationsServiceProvider extends ServiceProvider
 {
@@ -36,7 +37,7 @@ final class ClickhouseMigrationsServiceProvider extends ServiceProvider
                 $configRepository = $app->get(AppConfigRepositoryInterface::class);
                 $config = $configRepository->get('clickhouse.connection', []);
 
-                $clickhouse = new ClickhouseFactory($config);
+                $clickhouse = new ClickhouseClientFactory($config);
 
                 return $clickhouse->create();
             }

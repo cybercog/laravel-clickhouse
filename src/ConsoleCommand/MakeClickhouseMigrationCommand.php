@@ -11,9 +11,9 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\Commands;
+namespace Cog\Laravel\ClickhouseMigrations\ConsoleCommand;
 
-use Cog\Laravel\ClickhouseMigrations\Migrations\MigrationCreator;
+use Cog\Laravel\ClickhouseMigrations\Migration\MigrationCreator;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;

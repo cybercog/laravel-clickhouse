@@ -11,9 +11,11 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations;
+namespace Cog\Laravel\ClickhouseMigrations\Migration;
 
 use ClickHouseDB\Client;
+
+use function config;
 
 abstract class AbstractClickhouseMigration
 {

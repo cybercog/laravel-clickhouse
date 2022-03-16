@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\Migrations;
+namespace Cog\Laravel\ClickhouseMigrations\Migration;
 
 use ClickHouseDB\Client;
 use ClickHouseDB\Statement;

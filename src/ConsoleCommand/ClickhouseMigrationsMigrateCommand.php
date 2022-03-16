@@ -11,11 +11,11 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\Commands;
+namespace Cog\Laravel\ClickhouseMigrations\ConsoleCommand;
 
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
-use Cog\Laravel\ClickhouseMigrations\Migrations\Migrator;
+use Cog\Laravel\ClickhouseMigrations\Migration\Migrator;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 
 final class ClickhouseMigrationsMigrateCommand extends Command
