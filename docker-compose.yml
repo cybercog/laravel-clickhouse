@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  app:
+    container_name: laravel-clickhouse-migrations-app
+    image: laravel-clickhouse-migrations-app
+    build:
+      context: ./
+      dockerfile: ./.docker/php/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - clickhouse
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./.docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
+    networks:
+      - laravel-clickhouse-migrations
+
+  clickhouse:
+    container_name: laravel-clickhouse-migrations-clickhouse
+    image: yandex/clickhouse-server:21.8-alpine
+    volumes:
+      - ./.docker-volume-clickhouse:/var/lib/clickhouse
+      - ./.docker/clickhouse/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
+      - ./.docker/clickhouse/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/logging.xml:ro
+    healthcheck:
+      test: wget --spider -q 0.0.0.0:8123/ping
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    networks:
+      - laravel-clickhouse-migrations
+
+volumes:
+  .docker-volume-clickhouse:
+    driver: local
+
+networks:
+  laravel-clickhouse-migrations:
+    driver: bridge

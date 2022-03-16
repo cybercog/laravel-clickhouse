@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+use Cog\Laravel\ClickhouseMigrations\AbstractClickhouseMigration;
+
+return new class extends AbstractClickhouseMigration
+{
+    public function up(): void
+    {
+        $this->clickhouseClient->write(
+            <<<SQL
+
+            SQL
+        );
+    }
+};

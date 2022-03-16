@@ -1,0 +1,9 @@
+/.docker-volume-clickhouse
+/.idea
+/vendor
+.DS_STORE
+.phpunit.result.cache
+composer.phar
+composer.lock
+coverage.xml
+phpunit.xml

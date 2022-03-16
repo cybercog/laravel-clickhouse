@@ -1,0 +1,64 @@
+{
+    "name": "cybercog/laravel-clickhouse-migrations",
+    "description": "Clickhouse migrations for Laravel",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "cybercog",
+        "cog",
+        "clickhouse",
+        "migration",
+        "database",
+        "db",
+        "laravel"
+    ],
+    "authors": [
+        {
+            "name": "Anton Komarev",
+            "email": "anton@komarev.com",
+            "homepage": "https://komarev.com",
+            "role": "Developer"
+        }
+    ],
+    "homepage": "https://komarev.com/sources/laravel-clickhouse-migrations",
+    "support": {
+        "email": "open@cybercog.su",
+        "issues": "https://github.com/cybercog/laravel-clickhouse-migrations/issues",
+        "wiki": "https://github.com/cybercog/laravel-clickhouse-migrations/wiki",
+        "source": "https://github.com/cybercog/laravel-clickhouse-migrations",
+        "docs": "https://github.com/cybercog/laravel-clickhouse-migrations"
+    },
+    "require": {
+        "php": "^7.4|^8.0",
+        "illuminate/console": "^8.75|^9.0",
+        "illuminate/contracts": "^8.75|^9.0",
+        "illuminate/filesystem": "^8.75|^9.0",
+        "illuminate/support": "^8.75|^9.0",
+        "smi2/phpclickhouse": "^1.4"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^6.0|^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Cog\\Laravel\\ClickhouseMigrations\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Cog\\Tests\\Laravel\\ClickhouseMigrations\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Cog\\Laravel\\ClickhouseMigrations\\ClickhouseMigrationsServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable" : true
+}
