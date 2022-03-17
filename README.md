@@ -8,8 +8,14 @@
 
 ## Introduction
 
-Laravel ClickHouse Migrations is database helper package.
-It adds generation and execution of ClickHouse database migrations to the Laravel application.
+Laravel ClickHouse database integration.
+This package includes generation and execution of the ClickHouse database migrations in the Laravel application.
+
+## Features
+
+- [smi2/phpClickHouse] client integration
+- Migration creation
+- Migration execution
 
 ## Installation
 
@@ -43,7 +49,23 @@ Edit `config/clickhouse.php` file.
 
 ## Usage
 
-### Create migration
+### ClickHouse client
+
+You can use a singleton object [smi2/phpClickHouse] to query ClickHouse:
+
+```php
+app('clickhouse')->select(
+    /* Query */
+);
+
+app('clickhouse')->write(
+    /* Query */
+);
+```
+
+### ClickHouse database migration
+
+#### Create migration
 
 ```shell
 php artisan make:clickhouse-migration create_example_table
@@ -51,7 +73,7 @@ php artisan make:clickhouse-migration create_example_table
 
 > New migration will be created in `database/clickhouse-migrations` directory.
 
-### Run migrations
+#### Run migrations
 
 ```shell
 php artisan clickhouse:migrate
@@ -63,7 +85,7 @@ To remove the interactive question during production migrations, you can use `--
 php artisan clickhouse:migrate --force
 ```
 
-#### Step
+##### Step
 
 You can specify how many files need to be applied:
 
@@ -73,23 +95,9 @@ php artisan clickhouse:migrate --step=1
 
 > Value `0` is default — all files
 
-### Rollback migrations
+#### Rollback migrations
 
 > Rolling back migrations is intentionally unavailable. Migrations should go only forward.
-
-## Other
-
-You can use a singleton object [smi2/phpClickHouse](https://github.com/smi2/phpClickHouse#start) to query ClickHouse (used in migrations):
-
-```php
-app('clickhouse')->select(
-    /* Query */
-);
-
-app('clickhouse')->write(
-    /* Query */
-);
-```
 
 ## Changelog
 
@@ -107,9 +115,11 @@ Detailed changes for each release are documented in the [CHANGELOG.md](https://g
 
 [CyberCog] is a Social Unity of enthusiasts. Research the best solutions in product & software development is our passion.
 
-- [Follow us on Twitter](https://twitter.com/cybercog)
+- [Follow us on Twitter]
 
 <a href="https://cybercog.su"><img src="https://cloud.githubusercontent.com/assets/1849174/18418932/e9edb390-7860-11e6-8a43-aa3fad524664.png" alt="CyberCog"></a>
 
 [Anton Komarev]: https://komarev.com
 [CyberCog]: https://cybercog.su
+[Follow us on Twitter]: https://twitter.com/cybercog
+[smi2/phpClickHouse]: https://github.com/smi2/phpClickHouse#start
