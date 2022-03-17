@@ -1,5 +1,7 @@
 # Laravel ClickHouse
 
+![laravel-clickhouse](https://user-images.githubusercontent.com/1849174/158847081-af69213c-7f66-40e8-be0b-f127f128c653.png)
+
 <p align="center">
 <a href="https://discord.gg/YcZDjNTzSa"><img src="https://img.shields.io/static/v1?logo=discord&label=&message=Discord&color=36393f&style=flat-square" alt="Discord"></a>
 <a href="https://github.com/cybercog/laravel-clickhouse/releases"><img src="https://img.shields.io/github/release/cybercog/laravel-clickhouse.svg?style=flat-square" alt="Releases"></a>
