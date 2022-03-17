@@ -19,15 +19,15 @@ use function config;
 
 abstract class AbstractClickhouseMigration
 {
-    protected Client $clickhouseClient;
+    protected ?Client $clickhouseClient;
 
     protected string $databaseName;
 
     public function __construct(
-        Client $clickhouseClient,
+        ?Client $clickhouseClient = null,
         ?string $databaseName = null
     ) {
-        $this->clickhouseClient = $clickhouseClient;
+        $this->clickhouseClient = $clickhouseClient ?? app('clickhouse');
         $this->databaseName = $databaseName ?? config('clickhouse.connection.options.database');
     }
 

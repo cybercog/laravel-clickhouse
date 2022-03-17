@@ -6,10 +6,10 @@
         </default>
     </profiles>
     <users>
-        <bot>
+        <test>
             <profile>test</profile>
             <password />
             <quota>default</quota>
-        </bot>
+        </test>
     </users>
 </yandex>
