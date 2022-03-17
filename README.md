@@ -1,5 +1,13 @@
 # Laravel ClickHouse Migrations
 
+<p align="center">
+<a href="https://discord.gg/YcZDjNTzSa"><img src="https://img.shields.io/static/v1?logo=discord&label=&message=Discord&color=36393f&style=flat-square" alt="Discord"></a>
+<a href="https://github.com/cybercog/laravel-clickhouse-migrations/releases"><img src="https://img.shields.io/github/release/cybercog/laravel-clickhouse-migrations.svg?style=flat-square" alt="Releases"></a>
+<a href="https://github.com/cybercog/laravel-clickhouse-migrations/blob/master/LICENSE"><img src="https://img.shields.io/github/license/cybercog/laravel-clickhouse-migrations.svg?style=flat-square" alt="License"></a>
+</p>
+
+## Introduction
+
 Laravel ClickHouse Migrations is database helper package.
 It adds generation and execution of ClickHouse database migrations to the Laravel application.
 
@@ -90,6 +98,10 @@ Detailed changes for each release are documented in the [CHANGELOG.md](https://g
 ## License
 
 - `Laravel ClickHouse Migrations` package is open-sourced software licensed under the [MIT license](LICENSE) by [Anton Komarev].
+
+## 🌟 Stargazers over time
+
+[![Stargazers over time](https://chart.yhype.me/github/repository-star/v1/R_kgDOHA8mbQ.svg)](https://yhype.me?utm_source=github&utm_medium=cybercog-laravel-clickhouse-migrations&utm_content=chart-repository-star-cumulative)
 
 ## About CyberCog
 
