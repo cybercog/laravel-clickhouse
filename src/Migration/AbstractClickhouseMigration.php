@@ -27,7 +27,7 @@ abstract class AbstractClickhouseMigration
         ?Client $clickhouseClient = null,
         ?string $databaseName = null
     ) {
-        $this->clickhouseClient = $clickhouseClient ?? app('clickhouse');
+        $this->clickhouseClient = $clickhouseClient ?? app(Client::class);
         $this->databaseName = $databaseName ?? config('clickhouse.connection.options.database');
     }
 

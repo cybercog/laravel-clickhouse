@@ -32,12 +32,12 @@ final class ClickhouseServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(
-            'clickhouse',
+            ClickhouseClient::class,
             static function (Application $app): ClickhouseClient {
-                $configRepository = $app->get(AppConfigRepositoryInterface::class);
-                $config = $configRepository->get('clickhouse.connection', []);
+                $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
+                $connectionConfig = $appConfigRepository->get('clickhouse.connection', []);
 
-                $clickhouse = new ClickhouseClientFactory($config);
+                $clickhouse = new ClickhouseClientFactory($connectionConfig);
 
                 return $clickhouse->create();
             }
@@ -46,7 +46,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
         $this->app->singleton(
             Migrator::class,
             static function (Application $app): Migrator {
-                $client = $app->get('clickhouse');
+                $client = $app->get(ClickhouseClient::class);
                 $filesystem = $app->get(Filesystem::class);
                 $configRepository = $app->get(AppConfigRepositoryInterface::class);
                 $table = $configRepository->get('clickhouse.migrations.table');
