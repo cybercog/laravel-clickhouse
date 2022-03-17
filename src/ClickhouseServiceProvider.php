@@ -11,21 +11,21 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations;
+namespace Cog\Laravel\Clickhouse;
 
 use ClickHouseDB\Client as ClickhouseClient;
-use Cog\Laravel\ClickhouseMigrations\ConsoleCommand\ClickhouseMigrationsMigrateCommand;
-use Cog\Laravel\ClickhouseMigrations\ConsoleCommand\MakeClickhouseMigrationCommand;
-use Cog\Laravel\ClickhouseMigrations\Factory\ClickhouseClientFactory;
-use Cog\Laravel\ClickhouseMigrations\Migration\MigrationCreator;
-use Cog\Laravel\ClickhouseMigrations\Migration\MigrationRepository;
-use Cog\Laravel\ClickhouseMigrations\Migration\Migrator;
+use Cog\Laravel\Clickhouse\ConsoleCommand\ClickhouseMigrateCommand;
+use Cog\Laravel\Clickhouse\ConsoleCommand\MakeClickhouseMigrationCommand;
+use Cog\Laravel\Clickhouse\Factory\ClickhouseClientFactory;
+use Cog\Laravel\Clickhouse\Migration\MigrationCreator;
+use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
+use Cog\Laravel\Clickhouse\Migration\Migrator;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
-final class ClickhouseMigrationsServiceProvider extends ServiceProvider
+final class ClickhouseServiceProvider extends ServiceProvider
 {
     private const CONFIG_FILE_PATH = __DIR__ . '/../config/clickhouse.php';
 
@@ -97,7 +97,7 @@ final class ClickhouseMigrationsServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands(
                 [
-                    ClickhouseMigrationsMigrateCommand::class,
+                    ClickhouseMigrateCommand::class,
                     MakeClickhouseMigrationCommand::class,
                 ]
             );

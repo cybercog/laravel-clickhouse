@@ -2,8 +2,8 @@ version: "3.9"
 
 services:
   app:
-    container_name: laravel-clickhouse-migrations-app
-    image: laravel-clickhouse-migrations-app
+    container_name: laravel-clickhouse-app
+    image: laravel-clickhouse-app
     build:
       context: ./
       dockerfile: ./.docker/php/Dockerfile
@@ -15,10 +15,10 @@ services:
       - ./:/app
       - ./.docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
     networks:
-      - laravel-clickhouse-migrations
+      - laravel-clickhouse
 
   clickhouse:
-    container_name: laravel-clickhouse-migrations-clickhouse
+    container_name: laravel-clickhouse-clickhouse
     image: yandex/clickhouse-server:21.8-alpine
     volumes:
       - ./.docker-volume-clickhouse:/var/lib/clickhouse
@@ -37,12 +37,12 @@ services:
       - "8123:8123"
       - "9000:9000"
     networks:
-      - laravel-clickhouse-migrations
+      - laravel-clickhouse
 
 volumes:
   .docker-volume-clickhouse:
     driver: local
 
 networks:
-  laravel-clickhouse-migrations:
+  laravel-clickhouse:
     driver: bridge

@@ -11,23 +11,23 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\ConsoleCommand;
+namespace Cog\Laravel\Clickhouse\ConsoleCommand;
 
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
-use Cog\Laravel\ClickhouseMigrations\Migration\Migrator;
+use Cog\Laravel\Clickhouse\Migration\Migrator;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 
-final class ClickhouseMigrationsMigrateCommand extends Command
+final class ClickhouseMigrateCommand extends Command
 {
     use ConfirmableTrait;
 
-    protected static $defaultName = 'clickhouse-migrations:migrate';
+    protected static $defaultName = 'clickhouse:migrate';
 
     /**
      * {@inheritdoc}
      */
-    protected $signature = 'clickhouse-migrations:migrate
+    protected $signature = 'clickhouse:migrate
                 {--force : Force the operation to run when in production}
                 {--path= : Path to Clickhouse directory with migrations}
                 {--realpath : Indicate any provided migration file paths are pre-resolved absolute paths}

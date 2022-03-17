@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Cog\Laravel\ClickhouseMigrations\Migration\AbstractClickhouseMigration;
+use Cog\Laravel\Clickhouse\Migration\AbstractClickhouseMigration;
 
 return new class extends AbstractClickhouseMigration
 {

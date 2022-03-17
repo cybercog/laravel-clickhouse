@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\Migration;
+namespace Cog\Laravel\Clickhouse\Migration;
 
 use Illuminate\Filesystem\Filesystem;
 

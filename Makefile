@@ -1,7 +1,7 @@
-DOCKER-APP-EXEC = docker exec -it laravel-clickhouse-migrations-app /bin/sh -c
+DOCKER-APP-EXEC = docker exec -it laravel-clickhouse-app /bin/sh -c
 
 ssh: ## Connect to containers via SSH
-	docker exec -it laravel-clickhouse-migrations-app /bin/sh
+	docker exec -it laravel-clickhouse-app /bin/sh
 
 setup-dev: ## Setup project for development
 	make start

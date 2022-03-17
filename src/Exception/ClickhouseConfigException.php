@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\Exception;
+namespace Cog\Laravel\Clickhouse\Exception;
 
 use Exception;
 

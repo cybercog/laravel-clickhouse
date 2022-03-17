@@ -1,9 +1,9 @@
-# Laravel ClickHouse Migrations
+# Laravel ClickHouse
 
 <p align="center">
 <a href="https://discord.gg/YcZDjNTzSa"><img src="https://img.shields.io/static/v1?logo=discord&label=&message=Discord&color=36393f&style=flat-square" alt="Discord"></a>
-<a href="https://github.com/cybercog/laravel-clickhouse-migrations/releases"><img src="https://img.shields.io/github/release/cybercog/laravel-clickhouse-migrations.svg?style=flat-square" alt="Releases"></a>
-<a href="https://github.com/cybercog/laravel-clickhouse-migrations/blob/master/LICENSE"><img src="https://img.shields.io/github/license/cybercog/laravel-clickhouse-migrations.svg?style=flat-square" alt="License"></a>
+<a href="https://github.com/cybercog/laravel-clickhouse/releases"><img src="https://img.shields.io/github/release/cybercog/laravel-clickhouse.svg?style=flat-square" alt="Releases"></a>
+<a href="https://github.com/cybercog/laravel-clickhouse/blob/master/LICENSE"><img src="https://img.shields.io/github/license/cybercog/laravel-clickhouse.svg?style=flat-square" alt="License"></a>
 </p>
 
 ## Introduction
@@ -16,7 +16,7 @@ It adds generation and execution of ClickHouse database migrations to the Larave
 Pull in the package through [Composer](https://getcomposer.org/).
 
 ```shell
-composer require cybercog/laravel-clickhouse-migrations
+composer require cybercog/laravel-clickhouse
 ```
 
 ## Setup
@@ -36,7 +36,7 @@ CLICKHOUSE_DATABASE=default
 Publish ClickHouse configuration.
 
 ```shell
-php artisan vendor:publish --provider="Cog\Laravel\ClickhouseMigrations\ClickhouseMigrationsServiceProvider" --tag=config
+php artisan vendor:publish --provider="Cog\Laravel\Clickhouse\ClickhouseServiceProvider" --tag=config
 ```
 
 Edit `config/clickhouse.php` file.
@@ -54,13 +54,13 @@ php artisan make:clickhouse-migration create_example_table
 ### Run migrations
 
 ```shell
-php artisan clickhouse-migrations:migrate
+php artisan clickhouse:migrate
 ```
 
 To remove the interactive question during production migrations, you can use `--force` option.
 
 ```shell
-php artisan clickhouse-migrations:migrate --force
+php artisan clickhouse:migrate --force
 ```
 
 #### Step
@@ -68,7 +68,7 @@ php artisan clickhouse-migrations:migrate --force
 You can specify how many files need to be applied:
 
 ```shell
-php artisan clickhouse-migrations:migrate --step=1
+php artisan clickhouse:migrate --step=1
 ```
 
 > Value `0` is default — all files
@@ -93,15 +93,15 @@ app('clickhouse')->write(
 
 ## Changelog
 
-Detailed changes for each release are documented in the [CHANGELOG.md](https://github.com/cybercog/laravel-clickhouse-migrations/blob/master/CHANGELOG.md).
+Detailed changes for each release are documented in the [CHANGELOG.md](https://github.com/cybercog/laravel-clickhouse/blob/master/CHANGELOG.md).
 
 ## License
 
-- `Laravel ClickHouse Migrations` package is open-sourced software licensed under the [MIT license](LICENSE) by [Anton Komarev].
+- `Laravel ClickHouse` package is open-sourced software licensed under the [MIT license](LICENSE) by [Anton Komarev].
 
 ## 🌟 Stargazers over time
 
-[![Stargazers over time](https://chart.yhype.me/github/repository-star/v1/R_kgDOHA8mbQ.svg)](https://yhype.me?utm_source=github&utm_medium=cybercog-laravel-clickhouse-migrations&utm_content=chart-repository-star-cumulative)
+[![Stargazers over time](https://chart.yhype.me/github/repository-star/v1/R_kgDOHA8mbQ.svg)](https://yhype.me?utm_source=github&utm_medium=cybercog-laravel-clickhouse&utm_content=chart-repository-star-cumulative)
 
 ## About CyberCog
 

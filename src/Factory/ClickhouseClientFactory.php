@@ -11,10 +11,10 @@
 
 declare(strict_types=1);
 
-namespace Cog\Laravel\ClickhouseMigrations\Factory;
+namespace Cog\Laravel\Clickhouse\Factory;
 
 use ClickHouseDB\Client;
-use Cog\Laravel\ClickhouseMigrations\Exception\ClickhouseConfigException;
+use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 
 final class ClickhouseClientFactory
 {

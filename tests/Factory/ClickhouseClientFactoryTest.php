@@ -11,11 +11,11 @@
 
 declare(strict_types=1);
 
-namespace Cog\Tests\Laravel\ClickhouseMigrations\Factory;
+namespace Cog\Tests\Laravel\Clickhouse\Factory;
 
-use Cog\Laravel\ClickhouseMigrations\Exception\ClickhouseConfigException;
-use Cog\Laravel\ClickhouseMigrations\Factory\ClickhouseClientFactory;
-use Cog\Tests\Laravel\ClickhouseMigrations\AbstractTestCase;
+use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
+use Cog\Laravel\Clickhouse\Factory\ClickhouseClientFactory;
+use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
 use Exception;
 
 final class ClickhouseClientFactoryTest extends AbstractTestCase

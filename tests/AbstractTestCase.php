@@ -11,9 +11,9 @@
 
 declare(strict_types=1);
 
-namespace Cog\Tests\Laravel\ClickhouseMigrations;
+namespace Cog\Tests\Laravel\Clickhouse;
 
-use Cog\Laravel\ClickhouseMigrations\ClickhouseMigrationsServiceProvider;
+use Cog\Laravel\Clickhouse\ClickhouseServiceProvider;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
 abstract class AbstractTestCase extends OrchestraTestCase
@@ -25,7 +25,7 @@ abstract class AbstractTestCase extends OrchestraTestCase
         $app
     ): array {
         return [
-            ClickhouseMigrationsServiceProvider::class,
+            ClickhouseServiceProvider::class,
         ];
     }
 }
