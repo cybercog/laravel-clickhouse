@@ -56,11 +56,11 @@ Edit `config/clickhouse.php` file.
 You can use a singleton object [smi2/phpClickHouse] to query ClickHouse:
 
 ```php
-app('clickhouse')->select(
+app(\ClickHouseDB\Client::class)->select(
     /* Query */
 );
 
-app('clickhouse')->write(
+app(\ClickHouseDB\Client::class)->write(
     /* Query */
 );
 ```
