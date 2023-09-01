@@ -37,9 +37,9 @@ final class ClickhouseServiceProvider extends ServiceProvider
                 $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
                 $connectionConfig = $appConfigRepository->get('clickhouse.connection', []);
 
-                $clickhouse = new ClickhouseClientFactory($connectionConfig);
+                $clickhouseClientFactory = new ClickhouseClientFactory($connectionConfig);
 
-                return $clickhouse->create();
+                return $clickhouseClientFactory->create();
             }
         );
 
@@ -48,8 +48,8 @@ final class ClickhouseServiceProvider extends ServiceProvider
             static function (Application $app): Migrator {
                 $client = $app->get(ClickhouseClient::class);
                 $filesystem = $app->get(Filesystem::class);
-                $configRepository = $app->get(AppConfigRepositoryInterface::class);
-                $table = $configRepository->get('clickhouse.migrations.table');
+                $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
+                $table = $appConfigRepository->get('clickhouse.migrations.table');
 
                 $repository = new MigrationRepository(
                     $client,
@@ -69,7 +69,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
             static function (Application $app): MigrationCreator {
                 return new MigrationCreator(
                     $app->get(Filesystem::class),
-                    $app->basePath('stubs')
+                    $app->basePath('stubs'),
                 );
             }
         );
@@ -87,7 +87,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
         if (!$this->app->configurationIsCached()) {
             $this->mergeConfigFrom(
                 self::CONFIG_FILE_PATH,
-                'clickhouse'
+                'clickhouse',
             );
         }
     }
@@ -111,7 +111,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
                 [
                     self::CONFIG_FILE_PATH => $this->app->configPath('clickhouse.php'),
                 ],
-                'config'
+                'config',
             );
         }
     }
