@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of Laravel ClickHouse Migrations.
+ * This file is part of Laravel ClickHouse.
  *
  * (c) Anton Komarev <anton@komarev.com>
  *
@@ -17,8 +17,7 @@ use Illuminate\Filesystem\Filesystem;
 
 class MigrationCreator
 {
-    protected Filesystem $filesystem;
-
+    private Filesystem $filesystem;
     private ?string $migrationStubFilePath;
 
     public function __construct(

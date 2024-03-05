@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of Laravel ClickHouse Migrations.
+ * This file is part of Laravel ClickHouse.
  *
  * (c) Anton Komarev <anton@komarev.com>
  *
@@ -28,10 +28,8 @@ use function in_array;
 final class Migrator
 {
     private Client $client;
-
-    protected MigrationRepository $repository;
-
-    protected Filesystem $filesystem;
+    private MigrationRepository $repository;
+    private Filesystem $filesystem;
 
     public function __construct(
         Client $client,

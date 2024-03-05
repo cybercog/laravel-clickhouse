@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of Laravel ClickHouse Migrations.
+ * This file is part of Laravel ClickHouse.
  *
  * (c) Anton Komarev <anton@komarev.com>
  *
@@ -17,5 +17,4 @@ use Exception;
 
 final class ClickhouseConfigException extends Exception
 {
-    //
 }

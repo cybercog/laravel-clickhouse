@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of Laravel ClickHouse Migrations.
+ * This file is part of Laravel ClickHouse.
  *
  * (c) Anton Komarev <anton@komarev.com>
  *
@@ -58,7 +58,7 @@ final class ClickhouseMigrateCommand extends Command
 
     private function getStep(): int
     {
-        return (int)$this->option('step');
+        return intval($this->option('step'));
     }
 
     private function getMigrationsDirectoryPath(): string

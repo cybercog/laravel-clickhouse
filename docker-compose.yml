@@ -1,19 +1,35 @@
 version: "3.9"
 
 services:
-  app:
-    container_name: laravel-clickhouse-app
-    image: laravel-clickhouse-app
+  php74:
+    container_name: laravel-clickhouse-php74
+    image: laravel-clickhouse-php74
     build:
       context: ./
-      dockerfile: ./.docker/php/Dockerfile
+      dockerfile: ./.docker/php74/Dockerfile
     restart: unless-stopped
     depends_on:
       - clickhouse
     working_dir: /app
     volumes:
       - ./:/app
-      - ./.docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
+      - ./.docker/php74/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
+    networks:
+      - laravel-clickhouse
+
+  php82:
+    container_name: laravel-clickhouse-php82
+    image: laravel-clickhouse-php82
+    build:
+      context: ./
+      dockerfile: ./.docker/php82/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - clickhouse
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./.docker/php82/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
     networks:
       - laravel-clickhouse
 

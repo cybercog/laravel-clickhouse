@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of Laravel ClickHouse Migrations.
+ * This file is part of Laravel ClickHouse.
  *
  * (c) Anton Komarev <anton@komarev.com>
  *
@@ -24,9 +24,7 @@ use Symfony\Component\Console\Input\InputOption;
 final class MakeClickhouseMigrationCommand extends Command
 {
     private MigrationCreator $creator;
-
     private Composer $composer;
-
     private AppConfigRepositoryInterface $appConfigRepository;
 
     protected $description = 'Create a new ClickHouse migration file';

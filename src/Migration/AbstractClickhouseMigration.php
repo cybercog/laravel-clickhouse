@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of Laravel ClickHouse Migrations.
+ * This file is part of Laravel ClickHouse.
  *
  * (c) Anton Komarev <anton@komarev.com>
  *
@@ -20,7 +20,6 @@ use function config;
 abstract class AbstractClickhouseMigration
 {
     protected ?Client $clickhouseClient;
-
     protected string $databaseName;
 
     public function __construct(

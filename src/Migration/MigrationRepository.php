@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of Laravel ClickHouse Migrations.
+ * This file is part of Laravel ClickHouse.
  *
  * (c) Anton Komarev <anton@komarev.com>
  *
@@ -18,9 +18,8 @@ use ClickHouseDB\Statement;
 
 final class MigrationRepository
 {
-    protected Client $client;
-
-    protected string $table;
+    private Client $client;
+    private string $table;
 
     public function __construct(
         Client $client,
@@ -37,13 +36,13 @@ final class MigrationRepository
     {
         return $this->client->write(
             <<<SQL
-                CREATE TABLE IF NOT EXISTS {table} (
-                    migration String,
-                    batch UInt32,
-                    applied_at DateTime DEFAULT NOW()
-                )
-                ENGINE = ReplacingMergeTree()
-                ORDER BY migration
+            CREATE TABLE IF NOT EXISTS {table} (
+                migration String,
+                batch UInt32,
+                applied_at DateTime DEFAULT NOW()
+            )
+            ENGINE = ReplacingMergeTree()
+            ORDER BY migration
             SQL,
             [
                 'table' => $this->table,
@@ -58,8 +57,8 @@ final class MigrationRepository
     {
         $rows = $this->client->select(
             <<<SQL
-                SELECT migration
-                FROM {table}
+            SELECT migration
+            FROM {table}
             SQL,
             [
                 'table' => $this->table,
@@ -78,9 +77,9 @@ final class MigrationRepository
     {
         $rows = $this->client->select(
             <<<SQL
-                SELECT migration
-                FROM {table}
-                ORDER BY batch DESC, migration DESC
+            SELECT migration
+            FROM {table}
+            ORDER BY batch DESC, migration DESC
             SQL,
             [
                 'table' => $this->table,
@@ -100,8 +99,8 @@ final class MigrationRepository
         return $this->client
             ->select(
                 <<<SQL
-                    SELECT MAX(batch) AS batch
-                    FROM {table}
+                SELECT MAX(batch) AS batch
+                FROM {table}
                 SQL,
                 [
                     'table' => $this->table,
@@ -128,8 +127,8 @@ final class MigrationRepository
     {
         return (int)$this->client->select(
             <<<SQL
-                SELECT COUNT(*) AS count
-                FROM {table}
+            SELECT COUNT(*) AS count
+            FROM {table}
             SQL,
             [
                 'table' => $this->table,
@@ -141,7 +140,7 @@ final class MigrationRepository
     {
         return (bool)$this->client->select(
             <<<SQL
-                EXISTS TABLE {table}
+            EXISTS TABLE {table}
             SQL,
             [
                 'table' => $this->table,
@@ -158,10 +157,10 @@ final class MigrationRepository
     ): ?array {
         return $this->client->select(
             <<<SQL
-                SELECT *
-                FROM {table}
-                WHERE migration = :migration
-                LIMIT 1
+            SELECT *
+            FROM {table}
+            WHERE migration = :migration
+            LIMIT 1
             SQL,
             [
                 'table' => $this->table,
