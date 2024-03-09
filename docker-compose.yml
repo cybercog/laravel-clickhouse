@@ -1,37 +1,26 @@
 version: "3.9"
-
 services:
   php74:
-    container_name: laravel-clickhouse-php74
-    image: laravel-clickhouse-php74
+    container_name: laravel-clickhouse-lib-74
+    image: laravel-clickhouse-lib-74
     build:
       context: ./
       dockerfile: ./.docker/php74/Dockerfile
-    restart: unless-stopped
-    depends_on:
-      - clickhouse
+    tty: true
     working_dir: /app
     volumes:
       - ./:/app
-      - ./.docker/php74/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
-    networks:
-      - laravel-clickhouse
 
   php82:
-    container_name: laravel-clickhouse-php82
-    image: laravel-clickhouse-php82
+    container_name: laravel-clickhouse-lib-82
+    image: laravel-clickhouse-lib-82
     build:
       context: ./
       dockerfile: ./.docker/php82/Dockerfile
-    restart: unless-stopped
-    depends_on:
-      - clickhouse
+    tty: true
     working_dir: /app
     volumes:
       - ./:/app
-      - ./.docker/php82/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
-    networks:
-      - laravel-clickhouse
 
   clickhouse:
     container_name: laravel-clickhouse-clickhouse
@@ -52,13 +41,7 @@ services:
     ports:
       - "8123:8123"
       - "9000:9000"
-    networks:
-      - laravel-clickhouse
 
 volumes:
   .docker-volume-clickhouse:
     driver: local
-
-networks:
-  laravel-clickhouse:
-    driver: bridge
