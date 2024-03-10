@@ -39,7 +39,7 @@ final class ClickhouseClientFactoryTest extends AbstractTestCase
         $client = $clickhouse->create();
 
         self::assertSame('example.com', $client->getConnectHost());
-        self::assertSame(9000, $client->getConnectPort());
+        self::assertSame('9000', $client->getConnectPort());
         self::assertSame('test_user', $client->getConnectUsername());
         self::assertSame('secret', $client->getConnectPassword());
         self::assertSame('test_database', $client->settings()->getDatabase());
