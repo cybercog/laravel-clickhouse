@@ -25,7 +25,7 @@ final class ClickhouseClientFactoryTest extends AbstractTestCase
         $clickhouse = new ClickhouseClientFactory(
             [
                 'host' => 'example.com',
-                'port' => 9000,
+                'port' => '9000',
                 'username' => 'test_user',
                 'password' => 'secret',
                 'options' => [
@@ -43,8 +43,8 @@ final class ClickhouseClientFactoryTest extends AbstractTestCase
         self::assertSame('test_user', $client->getConnectUsername());
         self::assertSame('secret', $client->getConnectPassword());
         self::assertSame('test_database', $client->settings()->getDatabase());
-        self::assertSame(150.0, $client->getTimeout());
-        self::assertSame(151, $client->getConnectTimeOut());
+        self::assertSame(150, $client->getTimeout());
+        self::assertSame(151.0, $client->getConnectTimeOut());
     }
 
     public function testInitializationWithNonExistsOption(): void
@@ -52,7 +52,7 @@ final class ClickhouseClientFactoryTest extends AbstractTestCase
         $clickhouseFactory = new ClickhouseClientFactory(
             [
                 'host' => 'example.com',
-                'port' => 9000,
+                'port' => '9000',
                 'username' => 'test_user',
                 'password' => 'secret',
                 'options' => [
