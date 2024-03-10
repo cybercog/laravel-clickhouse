@@ -46,7 +46,7 @@ final class MigrationRepository
             SQL,
             [
                 'table' => $this->table,
-            ]
+            ],
         );
     }
 
@@ -62,7 +62,7 @@ final class MigrationRepository
             SQL,
             [
                 'table' => $this->table,
-            ]
+            ],
         )->rows();
 
         return collect($rows)->pluck('migration')->all();
@@ -83,7 +83,7 @@ final class MigrationRepository
             SQL,
             [
                 'table' => $this->table,
-            ]
+            ],
         )->rows();
 
         return collect($rows)->pluck('migration')->all();
@@ -104,7 +104,7 @@ final class MigrationRepository
                 SQL,
                 [
                     'table' => $this->table,
-                ]
+                ],
             )
             ->fetchOne('batch');
     }
@@ -116,13 +116,10 @@ final class MigrationRepository
         return $this->client->insert(
             $this->table,
             [[$migration, $batch]],
-            ['migration', 'batch']
+            ['migration', 'batch'],
         );
     }
 
-    /**
-     * @return int
-     */
     public function total(): int
     {
         return (int)$this->client->select(
@@ -132,7 +129,7 @@ final class MigrationRepository
             SQL,
             [
                 'table' => $this->table,
-            ]
+            ],
         )->fetchOne('count');
     }
 
@@ -144,7 +141,7 @@ final class MigrationRepository
             SQL,
             [
                 'table' => $this->table,
-            ]
+            ],
         )->fetchOne('result');
     }
 
@@ -165,7 +162,7 @@ final class MigrationRepository
             [
                 'table' => $this->table,
                 'migration' => $migration,
-            ]
+            ],
         )->fetchOne();
     }
 }

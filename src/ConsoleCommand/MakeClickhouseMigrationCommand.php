@@ -24,7 +24,9 @@ use Symfony\Component\Console\Input\InputOption;
 final class MakeClickhouseMigrationCommand extends Command
 {
     private MigrationCreator $creator;
+
     private Composer $composer;
+
     private AppConfigRepositoryInterface $appConfigRepository;
 
     protected $description = 'Create a new ClickHouse migration file';
@@ -130,7 +132,7 @@ final class MakeClickhouseMigrationCommand extends Command
 
         return rtrim(
             $this->appConfigRepository->get('clickhouse.migrations.path'),
-            '/'
+            '/',
         );
     }
 

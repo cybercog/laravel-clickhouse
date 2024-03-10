@@ -19,7 +19,7 @@ use function config;
 
 abstract class AbstractClickhouseMigration
 {
-    protected ?Client $clickhouseClient;
+    protected Client $clickhouseClient;
     protected string $databaseName;
 
     public function __construct(
