@@ -130,7 +130,7 @@ final class MakeClickhouseMigrationCommand extends Command
 
         return rtrim(
             $this->appConfigRepository->get('clickhouse.migrations.path'),
-            '/'
+            '/',
         );
     }
 

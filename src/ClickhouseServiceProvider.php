@@ -40,7 +40,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
                 $clickhouseClientFactory = new ClickhouseClientFactory($connectionConfig);
 
                 return $clickhouseClientFactory->create();
-            }
+            },
         );
 
         $this->app->singleton(
@@ -61,7 +61,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
                     $repository,
                     $filesystem,
                 );
-            }
+            },
         );
 
         $this->app->singleton(
@@ -71,7 +71,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
                     $app->get(Filesystem::class),
                     $app->basePath('stubs'),
                 );
-            }
+            },
         );
     }
 
@@ -99,7 +99,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
                 [
                     ClickhouseMigrateCommand::class,
                     MakeClickhouseMigrationCommand::class,
-                ]
+                ],
             );
         }
     }

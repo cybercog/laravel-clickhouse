@@ -53,7 +53,7 @@ final class Migrator
 
         if ($migrations->valid() === false) {
             $output->writeln(
-                '<info>Migrations are empty.</info>'
+                '<info>Migrations are empty.</info>',
             );
 
             return;
@@ -76,7 +76,7 @@ final class Migrator
             $this->repository->add($migrationName, $nextBatch);
 
             $output->writeln(
-                "<info>Completed in {$runTime} seconds</info> {$migrationName}"
+                "<info>Completed in {$runTime} seconds</info> {$migrationName}",
             );
 
             $migrations->next();
@@ -109,7 +109,7 @@ final class Migrator
     }
 
     /**
-     * @return SplFileInfo[]
+     * @return list<SplFileInfo>
      */
     private function getUnAppliedMigrationFiles(
         string $migrationsDirectoryPath
@@ -120,7 +120,7 @@ final class Migrator
             ->reject(
                 fn(SplFileInfo $migrationFile) => $this->isAppliedMigration(
                     $migrationFile->getFilename(),
-                )
+                ),
             )->all();
     }
 
@@ -145,7 +145,7 @@ final class Migrator
         string $migrationName
     ): string {
         return Str::studly(
-            implode('_', array_slice(explode('_', $migrationName), 4))
+            implode('_', array_slice(explode('_', $migrationName), 4)),
         );
     }
 
@@ -167,7 +167,7 @@ final class Migrator
         return in_array(
             $this->getMigrationName($fileName),
             $this->repository->all(),
-            true
+            true,
         );
     }
 }
