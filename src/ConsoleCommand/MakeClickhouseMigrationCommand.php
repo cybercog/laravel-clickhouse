@@ -18,8 +18,6 @@ use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Composer;
-use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 
 final class MakeClickhouseMigrationCommand extends Command
 {
@@ -27,44 +25,19 @@ final class MakeClickhouseMigrationCommand extends Command
     private Composer $composer;
     private AppConfigRepositoryInterface $appConfigRepository;
 
+    /**
+     * {@inheritdoc}
+     */
+    protected $signature = 'make:clickhouse-migration
+                            {name : The name of the migration}
+                            {--path= : The location where the migration file should be created}
+                            {--realpath : Indicate any provided migration file paths are pre-resolved absolute paths}
+                            {--fullpath : Output the full path of the migration}';
+
+    /**
+     * {@inheritdoc}
+     */
     protected $description = 'Create a new ClickHouse migration file';
-
-    protected static $defaultName = 'make:clickhouse-migration';
-
-    protected function getArguments(): array
-    {
-        return [
-            new InputArgument(
-                'name',
-                InputArgument::REQUIRED,
-                'The name of the migration',
-            ),
-        ];
-    }
-
-    protected function getOptions(): array
-    {
-        return [
-            new InputOption(
-                'path',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'The location where the migration file should be created',
-            ),
-            new InputOption(
-                'realpath',
-                null,
-                InputOption::VALUE_NONE,
-                'Indicate any provided migration file paths are pre-resolved absolute paths',
-            ),
-            new InputOption(
-                'fullpath',
-                null,
-                InputOption::VALUE_NONE,
-                'Output the full path of the migration',
-            ),
-        ];
-    }
 
     public function __construct(
         MigrationCreator $creator,
