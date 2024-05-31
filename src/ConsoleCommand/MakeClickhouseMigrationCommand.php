@@ -18,9 +18,11 @@ use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Composer;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
+#[AsCommand(name: 'make:clickhouse-migration')]
 final class MakeClickhouseMigrationCommand extends Command
 {
     private MigrationCreator $creator;
