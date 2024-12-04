@@ -111,8 +111,7 @@ Detailed changes for each release are documented in the [CHANGELOG.md](https://g
 
 ## 🌟 Stargazers over time
 
-[![Stargazers over time](https://chart.yhype.me/github/repository-star/v1/R_kgDOHA8mbQ.svg)](https://yhype.me?utm_source=github&utm_medium=cybercog-laravel-clickhouse&utm_content=chart-repository-star-cumulative)
-
+[![Stargazers over time](https://chart.yhype.me/github/repository-star/v1/470754925.svg)](https://yhype.me?utm_source=github&utm_medium=cybercog-laravel-clickhouse&utm_content=chart-repository-star-cumulative)
 ## About CyberCog
 
 [CyberCog] is a Social Unity of enthusiasts. Research the best solutions in product & software development is our passion.
