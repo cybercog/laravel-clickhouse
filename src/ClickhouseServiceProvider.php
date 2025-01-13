@@ -43,7 +43,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
             },
         );
 
-        $this->app->singleton(
+        $this->app->bind(
             Migrator::class,
             static function (Application $app): Migrator {
                 $client = $app->get(ClickhouseClient::class);
