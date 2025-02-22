@@ -22,6 +22,28 @@ services:
     volumes:
       - ./:/app
 
+  php83:
+    container_name: laravel-clickhouse-lib-83
+    image: laravel-clickhouse-lib-83
+    build:
+      context: ./
+      dockerfile: ./.docker/php83/Dockerfile
+    tty: true
+    working_dir: /app
+    volumes:
+      - ./:/app
+
+  php84:
+    container_name: laravel-clickhouse-lib-84
+    image: laravel-clickhouse-lib-84
+    build:
+      context: ./
+      dockerfile: ./.docker/php84/Dockerfile
+    tty: true
+    working_dir: /app
+    volumes:
+      - ./:/app
+
   clickhouse:
     container_name: laravel-clickhouse-clickhouse
     image: yandex/clickhouse-server:21.8-alpine
