@@ -6,24 +6,31 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
-      #fail-fast: true
+      fail-fast: true
       matrix:
-        php: [8.0, 8.1, 8.2, 8.3]
-        laravel: ['9.*', '10.*', '11.*']
+        os: [ubuntu-latest]
+        php: [8.0, 8.1, 8.2, 8.3, 8.4]
+        laravel: ['9.*', '10.*', '11.*', '12.*']
         dependency-version: [prefer-lowest, prefer-stable]
         exclude:
           - laravel: 9.*
             php: 8.2
           - laravel: 9.*
             php: 8.3
+          - laravel: 9.*
+            php: 8.4
           - laravel: 10.*
             php: 8.0
           - laravel: 11.*
             php: 8.0
           - laravel: 11.*
+            php: 8.1
+          - laravel: 12.*
+            php: 8.0
+          - laravel: 12.*
             php: 8.1
         include:
           - laravel: 9.*
@@ -32,6 +39,8 @@ jobs:
             testbench: 8.*
           - laravel: 11.*
             testbench: 9.*
+          - laravel: 12.*
+            testbench: 10.*
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.dependency-version }}
 
