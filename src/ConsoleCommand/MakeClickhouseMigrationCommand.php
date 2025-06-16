@@ -28,7 +28,7 @@ use Symfony\Component\Console\Input\InputOption;
 )]
 final class MakeClickhouseMigrationCommand extends Command
 {
-    private MigrationCreator $creator;
+    private MigrationCreator $migrationCreator;
     private Composer $composer;
     private AppConfigRepositoryInterface $appConfigRepository;
 
@@ -72,13 +72,13 @@ final class MakeClickhouseMigrationCommand extends Command
     }
 
     public function __construct(
-        MigrationCreator $creator,
+        MigrationCreator $migrationCreator,
         Composer $composer,
         AppConfigRepositoryInterface $appConfigRepository
     ) {
         parent::__construct();
 
-        $this->creator = $creator;
+        $this->migrationCreator = $migrationCreator;
         $this->composer = $composer;
         $this->appConfigRepository = $appConfigRepository;
     }
@@ -103,7 +103,7 @@ final class MakeClickhouseMigrationCommand extends Command
     private function writeMigration(
         string $migrationFileName
     ): void {
-        $filePath = $this->creator->create(
+        $filePath = $this->migrationCreator->create(
             $migrationFileName,
             $this->getMigrationPath(),
         );
