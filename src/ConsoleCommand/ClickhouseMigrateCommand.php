@@ -13,11 +13,16 @@ declare(strict_types=1);
 
 namespace Cog\Laravel\Clickhouse\ConsoleCommand;
 
+use Cog\Laravel\Clickhouse\Migration\Migrator;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
-use Cog\Laravel\Clickhouse\Migration\Migrator;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
+use Symfony\Component\Console\Attribute\AsCommand;
 
+#[AsCommand(
+    name: 'clickhouse:migrate',
+    description: 'Run the ClickHouse database migrations',
+)]
 final class ClickhouseMigrateCommand extends Command
 {
     use ConfirmableTrait;

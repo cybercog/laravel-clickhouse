@@ -22,7 +22,10 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
-#[AsCommand(name: 'make:clickhouse-migration')]
+#[AsCommand(
+    name: 'make:clickhouse-migration',
+    description: 'Create a new ClickHouse migration file',
+)]
 final class MakeClickhouseMigrationCommand extends Command
 {
     private MigrationCreator $creator;
