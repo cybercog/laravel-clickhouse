@@ -87,6 +87,45 @@ app(\ClickHouseDB\Client::class)->write(
 );
 ```
 
+#### Example: Working with nested JSON data
+
+After enabling `allow_experimental_object_type` in your configuration, you can create tables with JSON columns and store nested data:
+
+```php
+// In your migration
+$this->clickhouseClient->write(
+    <<<SQL
+    CREATE TABLE IF NOT EXISTS {$this->databaseName}.users (
+        id UInt64,
+        name String,
+        metadata JSON
+    ) ENGINE = MergeTree()
+    ORDER BY id
+    SQL
+);
+
+// Inserting nested JSON data
+app(\ClickHouseDB\Client::class)->insert('users', [
+    [
+        'id' => 1,
+        'name' => 'John Doe',
+        'metadata' => json_encode([
+            'address' => [
+                'street' => '123 Main St',
+                'city' => 'New York',
+            ],
+            'preferences' => [
+                'theme' => 'dark',
+                'language' => 'en',
+            ],
+        ]),
+    ],
+]);
+
+// Reading nested JSON data
+$users = app(\ClickHouseDB\Client::class)->select('SELECT * FROM users')->rows();
+```
+
 ### ClickHouse database migration
 
 #### Create migration
