@@ -49,6 +49,28 @@ php artisan vendor:publish --provider="Cog\Laravel\Clickhouse\ClickhouseServiceP
 
 Edit `config/clickhouse.php` file.
 
+### ClickHouse settings
+
+You can configure ClickHouse session settings in the configuration file. These settings will be applied to all queries made through the client.
+
+For example, to enable nested JSON storage using the experimental Object type:
+
+```php
+'connection' => [
+    // ... other connection settings
+    'settings' => [
+        'allow_experimental_object_type' => 1,
+    ],
+],
+```
+
+Common settings you might want to configure:
+- `allow_experimental_object_type` - Enable JSON/Object type for nested data structures
+- `max_execution_time` - Maximum query execution time in seconds
+- `max_memory_usage` - Maximum memory usage for query execution
+
+See [ClickHouse settings documentation](https://clickhouse.com/docs/en/operations/settings/settings) for all available settings.
+
 ## Usage
 
 ### ClickHouse client
