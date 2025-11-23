@@ -49,6 +49,28 @@ php artisan vendor:publish --provider="Cog\Laravel\Clickhouse\ClickhouseServiceP
 
 Edit `config/clickhouse.php` file.
 
+### ClickHouse settings
+
+You can configure ClickHouse session settings in the configuration file. These settings will be applied to all queries made through the client.
+
+For example, to enable nested JSON storage using the experimental Object type:
+
+```php
+'connection' => [
+    // ... other connection settings
+    'settings' => [
+        'allow_experimental_object_type' => 1,
+    ],
+],
+```
+
+Common settings you might want to configure:
+- `allow_experimental_object_type` - Enable JSON/Object type for nested data structures
+- `max_execution_time` - Maximum query execution time in seconds
+- `max_memory_usage` - Maximum memory usage for query execution
+
+See [ClickHouse settings documentation](https://clickhouse.com/docs/en/operations/settings/settings) for all available settings.
+
 ## Usage
 
 ### ClickHouse client
@@ -63,6 +85,45 @@ app(\ClickHouseDB\Client::class)->select(
 app(\ClickHouseDB\Client::class)->write(
     /* Query */
 );
+```
+
+#### Example: Working with nested JSON data
+
+After enabling `allow_experimental_object_type` in your configuration, you can create tables with JSON columns and store nested data:
+
+```php
+// In your migration
+$this->clickhouseClient->write(
+    <<<SQL
+    CREATE TABLE IF NOT EXISTS {$this->databaseName}.users (
+        id UInt64,
+        name String,
+        metadata JSON
+    ) ENGINE = MergeTree()
+    ORDER BY id
+    SQL
+);
+
+// Inserting nested JSON data
+app(\ClickHouseDB\Client::class)->insert('users', [
+    [
+        'id' => 1,
+        'name' => 'John Doe',
+        'metadata' => json_encode([
+            'address' => [
+                'street' => '123 Main St',
+                'city' => 'New York',
+            ],
+            'preferences' => [
+                'theme' => 'dark',
+                'language' => 'en',
+            ],
+        ]),
+    ],
+]);
+
+// Reading nested JSON data
+$users = app(\ClickHouseDB\Client::class)->select('SELECT * FROM users')->rows();
 ```
 
 ### ClickHouse database migration
