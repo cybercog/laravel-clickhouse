@@ -1,16 +1,5 @@
 version: "3.9"
 services:
-  php74:
-    container_name: laravel-clickhouse-lib-74
-    image: laravel-clickhouse-lib-74
-    build:
-      context: ./
-      dockerfile: ./.docker/php74/Dockerfile
-    tty: true
-    working_dir: /app
-    volumes:
-      - ./:/app
-
   php82:
     container_name: laravel-clickhouse-lib-82
     image: laravel-clickhouse-lib-82
@@ -39,6 +28,17 @@ services:
     build:
       context: ./
       dockerfile: ./.docker/php84/Dockerfile
+    tty: true
+    working_dir: /app
+    volumes:
+      - ./:/app
+
+  php85:
+    container_name: laravel-clickhouse-lib-85
+    image: laravel-clickhouse-lib-85
+    build:
+      context: ./
+      dockerfile: ./.docker/php85/Dockerfile
     tty: true
     working_dir: /app
     volumes:

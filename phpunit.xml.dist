@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
-         colors="true"
-         stopOnFailure="true"
+<phpunit
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
+  bootstrap="vendor/autoload.php"
+  colors="true"
+  stopOnFailure="true"
+  cacheDirectory=".phpunit.cache"
 >
-    <testsuites>
-        <testsuite name="Unit">
-            <directory suffix="Test.php">./tests</directory>
-            <exclude>./tests/assets</exclude>
-            <exclude>./tests/Asserts</exclude>
-        </testsuite>
-    </testsuites>
-    <filter>
-        <whitelist processUncoveredFilesFromWhitelist="true">
-            <directory suffix=".php">./src</directory>
-        </whitelist>
-    </filter>
-    <php>
-        <server name="APP_ENV" value="testing"/>
-        <server name="CLICKHOUSE_HOST" value="clickhouse"/>
-        <server name="CLICKHOUSE_PORT" value="8123"/>
-        <server name="CLICKHOUSE_USER" value="test"/>
-        <server name="CLICKHOUSE_PASSWORD" value=""/>
-        <server name="CLICKHOUSE_DATABASE" value="default"/>
-    </php>
+  <source>
+    <include>
+      <directory suffix=".php">./src</directory>
+    </include>
+  </source>
+  <testsuites>
+    <testsuite name="Unit">
+      <directory suffix="Test.php">./tests</directory>
+    </testsuite>
+  </testsuites>
+  <php>
+    <server name="APP_ENV" value="testing"/>
+    <server name="CLICKHOUSE_HOST" value="clickhouse"/>
+    <server name="CLICKHOUSE_PORT" value="8123"/>
+    <server name="CLICKHOUSE_USER" value="test"/>
+    <server name="CLICKHOUSE_PASSWORD" value=""/>
+    <server name="CLICKHOUSE_DATABASE" value="default"/>
+  </php>
 </phpunit>
