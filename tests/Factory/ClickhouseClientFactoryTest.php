@@ -33,7 +33,7 @@ final class ClickhouseClientFactoryTest extends AbstractTestCase
                     'timeout' => 150,
                     'connectTimeOut' => 151,
                 ],
-            ]
+            ],
         );
 
         $client = $clickhouse->create();
@@ -61,7 +61,7 @@ final class ClickhouseClientFactoryTest extends AbstractTestCase
                     'connectTimeOut' => 151,
                     'nonExistsOption' => 'value',
                 ],
-            ]
+            ],
         );
 
         try {

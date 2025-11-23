@@ -15,6 +15,4 @@ namespace Cog\Laravel\Clickhouse\Exception;
 
 use Exception;
 
-final class ClickhouseConfigException extends Exception
-{
-}
+final class ClickhouseConfigException extends Exception {}

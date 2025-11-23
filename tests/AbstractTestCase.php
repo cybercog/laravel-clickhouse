@@ -22,7 +22,7 @@ abstract class AbstractTestCase extends OrchestraTestCase
      * {@inheritdoc}
      */
     protected function getPackageProviders(
-        $app
+        $app,
     ): array {
         return [
             ClickhouseServiceProvider::class,
