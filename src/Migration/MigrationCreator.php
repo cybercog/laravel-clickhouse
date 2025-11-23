@@ -17,20 +17,14 @@ use Illuminate\Filesystem\Filesystem;
 
 class MigrationCreator
 {
-    private Filesystem $filesystem;
-    private ?string $migrationStubFilePath;
-
     public function __construct(
-        Filesystem $filesystem,
-        ?string $migrationStubFilePath
-    ) {
-        $this->filesystem = $filesystem;
-        $this->migrationStubFilePath = $migrationStubFilePath;
-    }
+        private Filesystem $filesystem,
+        private ?string $migrationStubFilePath,
+    ) {}
 
     public function create(
         string $fileName,
-        string $migrationsDirectoryPath
+        string $migrationsDirectoryPath,
     ): ?string {
         $stubFileContent = $this->getStubFileContent();
 
@@ -45,7 +39,7 @@ class MigrationCreator
 
     private function generateMigrationFilePath(
         string $name,
-        string $migrationsDirectoryPath
+        string $migrationsDirectoryPath,
     ): string {
         return $migrationsDirectoryPath . '/' . $this->getDatePrefix() . '_' . $name . '.php';
     }

@@ -18,13 +18,9 @@ use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 
 final class ClickhouseClientFactory
 {
-    private array $defaultConfig;
-
     public function __construct(
-        array $defaultConfig
-    ) {
-        $this->defaultConfig = $defaultConfig;
-    }
+        private array $defaultConfig,
+    ) {}
 
     /**
      * Creating a new instance of ClickHouse Client.
@@ -35,7 +31,7 @@ final class ClickhouseClientFactory
      * @throws ClickhouseConfigException
      */
     public function create(
-        array $config = []
+        array $config = [],
     ): Client {
         if (count($config) === 0) {
             $config = $this->defaultConfig;
@@ -65,7 +61,7 @@ final class ClickhouseClientFactory
      */
     private function resolveOptionMutatorMethod(
         Client $client,
-        string $option
+        string $option,
     ): string {
         if (method_exists($client, $option)) {
             return $option;

@@ -16,10 +16,10 @@ namespace Cog\Laravel\Clickhouse\Migration;
 use ClickHouseDB\Client;
 use DomainException;
 use Generator;
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
-use Illuminate\Support\Str;
 use Illuminate\Console\OutputStyle;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
 use ReflectionClass;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -27,19 +27,11 @@ use function in_array;
 
 final class Migrator
 {
-    private Client $client;
-    private MigrationRepository $repository;
-    private Filesystem $filesystem;
-
     public function __construct(
-        Client $client,
-        MigrationRepository $repository,
-        Filesystem $files
-    ) {
-        $this->client = $client;
-        $this->filesystem = $files;
-        $this->repository = $repository;
-    }
+        private Client $client,
+        private MigrationRepository $repository,
+        private Filesystem $filesystem,
+    ) {}
 
     /**
      * @throws FileNotFoundException
@@ -47,7 +39,7 @@ final class Migrator
     public function runUp(
         string $migrationsDirectoryPath,
         OutputStyle $output,
-        int $step
+        int $step,
     ): void {
         $migrations = $this->getMigrationsUp($migrationsDirectoryPath);
 
@@ -93,7 +85,7 @@ final class Migrator
     }
 
     private function getMigrationsUp(
-        string $migrationsDirectoryPath
+        string $migrationsDirectoryPath,
     ): Generator {
         $migrationFiles = $this->getUnAppliedMigrationFiles($migrationsDirectoryPath);
 
@@ -103,7 +95,7 @@ final class Migrator
     }
 
     private function getMigrationName(
-        string $migrationFilePath
+        string $migrationFilePath,
     ): string {
         return str_replace('.php', '', basename($migrationFilePath));
     }
@@ -112,15 +104,13 @@ final class Migrator
      * @return list<SplFileInfo>
      */
     private function getUnAppliedMigrationFiles(
-        string $migrationsDirectoryPath
+        string $migrationsDirectoryPath,
     ): array {
         $migrationFiles = $this->filesystem->files($migrationsDirectoryPath);
 
         return collect($migrationFiles)
             ->reject(
-                fn(SplFileInfo $migrationFile) => $this->isAppliedMigration(
-                    $migrationFile->getFilename(),
-                ),
+                fn(SplFileInfo $migrationFile) => $this->isAppliedMigration($migrationFile->getFilename()),
             )->all();
     }
 
@@ -128,7 +118,7 @@ final class Migrator
      * @throws FileNotFoundException
      */
     private function resolveMigrationInstance(
-        string $path
+        string $path,
     ): object {
         $class = $this->generateMigrationClassName($this->getMigrationName($path));
 
@@ -142,7 +132,7 @@ final class Migrator
     }
 
     private function generateMigrationClassName(
-        string $migrationName
+        string $migrationName,
     ): string {
         return Str::studly(
             implode('_', array_slice(explode('_', $migrationName), 4)),
@@ -150,7 +140,7 @@ final class Migrator
     }
 
     private function resolveMigrationNameFromInstance(
-        object $migration
+        object $migration,
     ): string {
         $reflectionClass = new ReflectionClass($migration);
 
@@ -162,7 +152,7 @@ final class Migrator
     }
 
     private function isAppliedMigration(
-        string $fileName
+        string $fileName,
     ): bool {
         return in_array(
             $this->getMigrationName($fileName),

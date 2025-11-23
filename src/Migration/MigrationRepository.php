@@ -18,16 +18,10 @@ use ClickHouseDB\Statement;
 
 final class MigrationRepository
 {
-    private Client $client;
-    private string $table;
-
     public function __construct(
-        Client $client,
-        string $table
-    ) {
-        $this->client = $client;
-        $this->table = $table;
-    }
+        private Client $client,
+        private string $table,
+    ) {}
 
     /**
      * Creating a new table to store migrations.
@@ -36,14 +30,14 @@ final class MigrationRepository
     {
         return $this->client->write(
             <<<SQL
-            CREATE TABLE IF NOT EXISTS {table} (
-                migration String,
-                batch UInt32,
-                applied_at DateTime DEFAULT NOW()
-            )
-            ENGINE = ReplacingMergeTree()
-            ORDER BY migration
-            SQL,
+                CREATE TABLE IF NOT EXISTS {table} (
+                    migration String,
+                    batch UInt32,
+                    applied_at DateTime DEFAULT NOW()
+                )
+                ENGINE = ReplacingMergeTree()
+                ORDER BY migration
+                SQL,
             [
                 'table' => $this->table,
             ],
@@ -57,9 +51,9 @@ final class MigrationRepository
     {
         $rows = $this->client->select(
             <<<SQL
-            SELECT migration
-            FROM {table}
-            SQL,
+                SELECT migration
+                FROM {table}
+                SQL,
             [
                 'table' => $this->table,
             ],
@@ -77,10 +71,10 @@ final class MigrationRepository
     {
         $rows = $this->client->select(
             <<<SQL
-            SELECT migration
-            FROM {table}
-            ORDER BY batch DESC, migration DESC
-            SQL,
+                SELECT migration
+                FROM {table}
+                ORDER BY batch DESC, migration DESC
+                SQL,
             [
                 'table' => $this->table,
             ],
@@ -99,9 +93,9 @@ final class MigrationRepository
         return $this->client
             ->select(
                 <<<SQL
-                SELECT MAX(batch) AS batch
-                FROM {table}
-                SQL,
+                    SELECT MAX(batch) AS batch
+                    FROM {table}
+                    SQL,
                 [
                     'table' => $this->table,
                 ],
@@ -111,7 +105,7 @@ final class MigrationRepository
 
     public function add(
         string $migration,
-        int $batch
+        int $batch,
     ): Statement {
         return $this->client->insert(
             $this->table,
@@ -124,9 +118,9 @@ final class MigrationRepository
     {
         return (int)$this->client->select(
             <<<SQL
-            SELECT COUNT(*) AS count
-            FROM {table}
-            SQL,
+                SELECT COUNT(*) AS count
+                FROM {table}
+                SQL,
             [
                 'table' => $this->table,
             ],
@@ -137,8 +131,8 @@ final class MigrationRepository
     {
         return (bool)$this->client->select(
             <<<SQL
-            EXISTS TABLE {table}
-            SQL,
+                EXISTS TABLE {table}
+                SQL,
             [
                 'table' => $this->table,
             ],
@@ -150,15 +144,15 @@ final class MigrationRepository
      * @return array|null
      */
     public function find(
-        string $migration
+        string $migration,
     ): ?array {
         return $this->client->select(
             <<<SQL
-            SELECT *
-            FROM {table}
-            WHERE migration = :migration
-            LIMIT 1
-            SQL,
+                SELECT *
+                FROM {table}
+                WHERE migration = :migration
+                LIMIT 1
+                SQL,
             [
                 'table' => $this->table,
                 'migration' => $migration,
