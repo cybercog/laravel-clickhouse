@@ -28,14 +28,6 @@ use Symfony\Component\Console\Input\InputOption;
 )]
 final class MakeClickhouseMigrationCommand extends Command
 {
-    private MigrationCreator $migrationCreator;
-    private Composer $composer;
-    private AppConfigRepositoryInterface $appConfigRepository;
-
-    protected $description = 'Create a new ClickHouse migration file';
-
-    protected static $defaultName = 'make:clickhouse-migration';
-
     protected function getArguments(): array
     {
         return [
@@ -72,15 +64,11 @@ final class MakeClickhouseMigrationCommand extends Command
     }
 
     public function __construct(
-        MigrationCreator $migrationCreator,
-        Composer $composer,
-        AppConfigRepositoryInterface $appConfigRepository
+        private MigrationCreator $migrationCreator,
+        private Composer $composer,
+        private AppConfigRepositoryInterface $appConfigRepository,
     ) {
         parent::__construct();
-
-        $this->migrationCreator = $migrationCreator;
-        $this->composer = $composer;
-        $this->appConfigRepository = $appConfigRepository;
     }
 
     /**
@@ -101,7 +89,7 @@ final class MakeClickhouseMigrationCommand extends Command
      * @throws FileNotFoundException
      */
     private function writeMigration(
-        string $migrationFileName
+        string $migrationFileName,
     ): void {
         $filePath = $this->migrationCreator->create(
             $migrationFileName,

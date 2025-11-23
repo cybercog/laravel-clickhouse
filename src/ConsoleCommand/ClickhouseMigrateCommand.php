@@ -27,8 +27,6 @@ final class ClickhouseMigrateCommand extends Command
 {
     use ConfirmableTrait;
 
-    protected static $defaultName = 'clickhouse:migrate';
-
     /**
      * {@inheritdoc}
      */
@@ -38,27 +36,28 @@ final class ClickhouseMigrateCommand extends Command
                 {--realpath : Indicate any provided migration file paths are pre-resolved absolute paths}
                 {--step= : Number of migrations to run}';
 
-    /**
-     * {@inheritdoc}
-     */
-    protected $description = 'Run the ClickHouse database migrations';
+    public function __construct(
+        private Migrator $migrator,
+        private AppConfigRepositoryInterface $appConfig,
+    ) {
+        parent::__construct();
+    }
 
-    public function handle(
-        Migrator $migrator
-    ): int {
+    public function handle(): int
+    {
         if (!$this->confirmToProceed()) {
-            return self::FAILURE;
+            return 1;
         }
 
-        $migrator->ensureTableExists();
+        $this->migrator->ensureTableExists();
 
-        $migrator->runUp(
+        $this->migrator->runUp(
             $this->getMigrationsDirectoryPath(),
             $this->getOutput(),
             $this->getStep(),
         );
 
-        return self::SUCCESS;
+        return 0;
     }
 
     private function getStep(): int
@@ -68,10 +67,6 @@ final class ClickhouseMigrateCommand extends Command
 
     private function getMigrationsDirectoryPath(): string
     {
-        $appConfigRepository = $this->laravel->get(AppConfigRepositoryInterface::class);
-
-        return $appConfigRepository->get(
-            'clickhouse.migrations.path',
-        );
+        return $this->appConfig->get('clickhouse.migrations.path');
     }
 }
