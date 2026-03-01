@@ -38,11 +38,18 @@ final class ClickhouseClientFactory
         }
 
         $options = [];
+        $settings = [];
 
         if (isset($config['options'])) {
             $options = $config['options'];
 
             unset($config['options']);
+        }
+
+        if (isset($config['settings'])) {
+            $settings = $config['settings'];
+
+            unset($config['settings']);
         }
 
         $client = new Client($config);
@@ -51,6 +58,10 @@ final class ClickhouseClientFactory
             $method = $this->resolveOptionMutatorMethod($client, $option);
 
             $client->$method($value);
+        }
+
+        foreach ($settings as $setting => $value) {
+            $client->settings()->set($setting, $value);
         }
 
         return $client;
