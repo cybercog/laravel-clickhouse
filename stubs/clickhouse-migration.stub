@@ -11,7 +11,7 @@ return new class extends AbstractClickhouseMigration
         $this->clickhouseClient->write(
             <<<'SQL'
 
-                SQL
+                SQL,
         );
     }
 };
