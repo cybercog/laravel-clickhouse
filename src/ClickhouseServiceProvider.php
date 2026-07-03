@@ -52,12 +52,14 @@ final class ClickhouseServiceProvider extends ServiceProvider
                 $table = $appConfigRepository->get('clickhouse.migrations.table');
                 $cluster = $appConfigRepository->get('clickhouse.connection.cluster_name');
                 $database = $appConfigRepository->get('clickhouse.connection.options.database');
+                $replicated = $appConfigRepository->get('clickhouse.connection.replicated', false);
 
                 $repository = new MigrationRepository(
                     $client,
                     $table,
                     $cluster,
                     $database,
+                    $replicated,
                 );
 
                 return new Migrator(
