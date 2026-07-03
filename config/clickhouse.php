@@ -24,6 +24,7 @@ return [
     */
 
     'connection' => [
+        'cluster_name' => env('CLICKHOUSE_CLUSTER_NAME'),
         'host' => env('CLICKHOUSE_HOST', 'localhost'),
         'port' => env('CLICKHOUSE_PORT', 8123),
         'username' => env('CLICKHOUSE_USER', 'default'),
