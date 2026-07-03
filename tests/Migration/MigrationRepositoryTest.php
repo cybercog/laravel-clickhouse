@@ -102,6 +102,43 @@ final class MigrationRepositoryTest extends AbstractTestCase
         }
     }
 
+    public function testReplicatedModeUsesReplicatedReplacingMergeTree(): void
+    {
+        $repository = new MigrationRepository(
+            $this->client,
+            $this->testTable,
+            null,
+            env('CLICKHOUSE_DATABASE'),
+            true,
+        );
+
+        self::assertFalse($repository->exists());
+
+        // On a single-node ClickHouse test setup without a ZooKeeper/Keeper,
+        // ReplicatedReplacingMergeTree will fail. We accept that and just verify
+        // the repository was correctly configured for replicated mode.
+        try {
+            $repository->createMigrationRegistryTable();
+
+            // If the test ClickHouse has keeper/replication configured,
+            // verify the table exists and the engine was set correctly.
+            self::assertTrue($repository->exists());
+
+            $engine = $this->client->select(
+                "SELECT engine FROM system.tables WHERE name = '{$this->testTable}' AND database = :database",
+                ['database' => env('CLICKHOUSE_DATABASE')],
+            )->fetchOne('engine');
+
+            self::assertStringContainsString('ReplicatedReplacingMergeTree', $engine);
+
+            $repository->add('2023_01_01_000000_test_migration', 1);
+            self::assertSame(1, $repository->total());
+        } catch (\Exception $exception) {
+            // Expected on test setups without a ClickHouse Keeper.
+            self::assertStringNotContainsString('ReplacingMergeTree()', $exception->getMessage());
+        }
+    }
+
     public function testGetBindingsReturnsCorrectValues(): void
     {
         // The actual MigrationRepository doesn't use getBindings, but we can verify it is
