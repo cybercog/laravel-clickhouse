@@ -22,17 +22,20 @@ final class MigrationRepository
     private string $table;
     private ?string $cluster;
     private ?string $database;
+    private bool $replicated;
 
     public function __construct(
         Client $client,
         string $table,
         ?string $cluster = null,
         ?string $database = null,
+        bool $replicated = false,
     ) {
         $this->client = $client;
         $this->table = $table;
         $this->cluster = $cluster;
         $this->database = $database;
+        $this->replicated = $replicated;
     }
 
     /**
@@ -52,6 +55,11 @@ final class MigrationRepository
         return $this->cluster !== null && $this->cluster !== '';
     }
 
+    private function isReplicated(): bool
+    {
+        return $this->replicated;
+    }
+
     private function getTargetTable(): string
     {
         return $this->isSharded() ? "{$this->table}_distributed" : $this->table;
@@ -59,6 +67,10 @@ final class MigrationRepository
 
     private function createSimpleMigrationRegistryTable(): Statement
     {
+        $engine = $this->isReplicated()
+            ? 'ReplicatedReplacingMergeTree()'
+            : 'ReplacingMergeTree()';
+
         return $this->client->write(
             <<<SQL
                 CREATE TABLE IF NOT EXISTS {table} (
@@ -66,7 +78,7 @@ final class MigrationRepository
                     batch UInt32,
                     applied_at DateTime DEFAULT NOW()
                 )
-                ENGINE = ReplacingMergeTree()
+                ENGINE = {$engine}
                 ORDER BY migration
                 SQL,
             [
@@ -77,6 +89,10 @@ final class MigrationRepository
 
     private function createShardedMigrationRegistryTable(): Statement
     {
+        $engine = $this->isReplicated()
+            ? 'ReplicatedReplacingMergeTree()'
+            : 'ReplicatedMergeTree()';
+
         $this->client->write(
             <<<SQL
                 CREATE TABLE IF NOT EXISTS {table} ON CLUSTER {cluster} (
@@ -84,7 +100,7 @@ final class MigrationRepository
                     batch UInt32,
                     applied_at DateTime DEFAULT NOW()
                 )
-                ENGINE = ReplicatedMergeTree()
+                ENGINE = {$engine}
                 ORDER BY migration
                 SQL,
             [
