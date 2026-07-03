@@ -50,10 +50,14 @@ final class ClickhouseServiceProvider extends ServiceProvider
                 $filesystem = $app->get(Filesystem::class);
                 $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
                 $table = $appConfigRepository->get('clickhouse.migrations.table');
+                $cluster = $appConfigRepository->get('clickhouse.connection.cluster_name');
+                $database = $appConfigRepository->get('clickhouse.connection.options.database');
 
                 $repository = new MigrationRepository(
                     $client,
                     $table,
+                    $cluster,
+                    $database,
                 );
 
                 return new Migrator(
