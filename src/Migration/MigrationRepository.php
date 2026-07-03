@@ -68,8 +68,8 @@ final class MigrationRepository
     private function createSimpleMigrationRegistryTable(): Statement
     {
         $engine = $this->isReplicated()
-            ? 'ReplicatedReplacingMergeTree()'
-            : 'ReplacingMergeTree()';
+            ? 'ReplicatedReplacingMergeTree'
+            : 'ReplacingMergeTree';
 
         return $this->client->write(
             <<<SQL
@@ -90,8 +90,8 @@ final class MigrationRepository
     private function createShardedMigrationRegistryTable(): Statement
     {
         $engine = $this->isReplicated()
-            ? 'ReplicatedReplacingMergeTree()'
-            : 'ReplicatedMergeTree()';
+            ? 'ReplicatedReplacingMergeTree'
+            : 'ReplicatedMergeTree';
 
         $this->client->write(
             <<<SQL
