@@ -37,6 +37,42 @@ CLICKHOUSE_PORT=8123
 CLICKHOUSE_USER=default
 CLICKHOUSE_PASSWORD=
 CLICKHOUSE_DATABASE=default
+CLICKHOUSE_CLUSTER_NAME=          # optional — see Cluster / Sharding section below
+CLICKHOUSE_REPLICATED=false       # optional — see Replication section below
+```
+
+### Clustered / Sharded setups
+
+If your ClickHouse cluster uses sharding, set `CLICKHOUSE_CLUSTER_NAME`. The package will then:
+- Create migration tables with `ON CLUSTER {cluster}`
+- Use a `{table}_distributed` view for reads and writes
+- Make `getBindings()` in migrations include `{cluster}` for your SQL
+
+```dotenv
+CLICKHOUSE_CLUSTER_NAME=my_cluster
+```
+
+In your migrations, extend `AbstractClickhouseMigration` and use `getBindings()`:
+
+```php
+return new class extends AbstractClickhouseMigration
+{
+    public function up(): void
+    {
+        $this->clickhouseClient->write(
+            "CREATE TABLE my_table ON CLUSTER {cluster} ...",
+            $this->getBindings()
+        );
+    }
+};
+```
+
+### Replicated setups
+
+If your ClickHouse tables are replicated (even on a single-node cluster), set `CLICKHOUSE_REPLICATED=true`. This changes the migration table engine from `ReplacingMergeTree` to `ReplicatedReplacingMergeTree` (or `ReplicatedMergeTree` in sharded mode).
+
+```dotenv
+CLICKHOUSE_REPLICATED=true
 ```
 
 ### Configuration customization
