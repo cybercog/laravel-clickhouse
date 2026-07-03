@@ -18,15 +18,46 @@ use ClickHouseDB\Statement;
 
 final class MigrationRepository
 {
+    private Client $client;
+    private string $table;
+    private ?string $cluster;
+    private ?string $database;
+
     public function __construct(
-        private Client $client,
-        private string $table,
-    ) {}
+        Client $client,
+        string $table,
+        ?string $cluster = null,
+        ?string $database = null,
+    ) {
+        $this->client = $client;
+        $this->table = $table;
+        $this->cluster = $cluster;
+        $this->database = $database;
+    }
 
     /**
      * Creating a new table to store migrations.
      */
     public function createMigrationRegistryTable(): Statement
+    {
+        if ($this->isSharded()) {
+            return $this->createShardedMigrationRegistryTable();
+        }
+
+        return $this->createSimpleMigrationRegistryTable();
+    }
+
+    private function isSharded(): bool
+    {
+        return $this->cluster !== null && $this->cluster !== '';
+    }
+
+    private function getTargetTable(): string
+    {
+        return $this->isSharded() ? "{$this->table}_distributed" : $this->table;
+    }
+
+    private function createSimpleMigrationRegistryTable(): Statement
     {
         return $this->client->write(
             <<<SQL
@@ -44,6 +75,37 @@ final class MigrationRepository
         );
     }
 
+    private function createShardedMigrationRegistryTable(): Statement
+    {
+        $this->client->write(
+            <<<SQL
+                CREATE TABLE IF NOT EXISTS {table} ON CLUSTER {cluster} (
+                    migration String,
+                    batch UInt32,
+                    applied_at DateTime DEFAULT NOW()
+                )
+                ENGINE = ReplicatedMergeTree()
+                ORDER BY migration
+                SQL,
+            [
+                'table' => $this->table,
+                'cluster' => $this->cluster,
+            ],
+        );
+
+        return $this->client->write(
+            <<<SQL
+                CREATE TABLE IF NOT EXISTS {table}_distributed ON CLUSTER {cluster}
+                ENGINE = Distributed({cluster}, {database}, {table}, rand())
+                SQL,
+            [
+                'table' => $this->table,
+                'cluster' => $this->cluster,
+                'database' => $this->database,
+            ],
+        );
+    }
+
     /**
      * @return array
      */
@@ -55,7 +117,7 @@ final class MigrationRepository
                 FROM {table}
                 SQL,
             [
-                'table' => $this->table,
+                'table' => $this->getTargetTable(),
             ],
         )->rows();
 
@@ -76,7 +138,7 @@ final class MigrationRepository
                 ORDER BY batch DESC, migration DESC
                 SQL,
             [
-                'table' => $this->table,
+                'table' => $this->getTargetTable(),
             ],
         )->rows();
 
@@ -97,7 +159,7 @@ final class MigrationRepository
                     FROM {table}
                     SQL,
                 [
-                    'table' => $this->table,
+                    'table' => $this->getTargetTable(),
                 ],
             )
             ->fetchOne('batch');
@@ -108,7 +170,7 @@ final class MigrationRepository
         int $batch,
     ): Statement {
         return $this->client->insert(
-            $this->table,
+            $this->getTargetTable(),
             [[$migration, $batch]],
             ['migration', 'batch'],
         );
@@ -122,7 +184,7 @@ final class MigrationRepository
                 FROM {table}
                 SQL,
             [
-                'table' => $this->table,
+                'table' => $this->getTargetTable(),
             ],
         )->fetchOne('count');
     }
@@ -134,7 +196,7 @@ final class MigrationRepository
                 EXISTS TABLE {table}
                 SQL,
             [
-                'table' => $this->table,
+                'table' => $this->getTargetTable(),
             ],
         )->fetchOne('result');
     }
@@ -154,7 +216,7 @@ final class MigrationRepository
                 LIMIT 1
                 SQL,
             [
-                'table' => $this->table,
+                'table' => $this->getTargetTable(),
                 'migration' => $migration,
             ],
         )->fetchOne();
