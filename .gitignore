@@ -1,7 +1,8 @@
 /.claude/
 /.docker-volume-clickhouse
 /.idea
-/.phpunit.cache
+/.serena/
+.phpunit.cache
 /vendor
 .DS_STORE
 composer.phar
