@@ -18,8 +18,8 @@ use Illuminate\Filesystem\Filesystem;
 class MigrationCreator
 {
     public function __construct(
-        private Filesystem $filesystem,
-        private ?string $migrationStubFilePath,
+        private readonly Filesystem $filesystem,
+        private readonly ?string $migrationStubFilePath,
     ) {}
 
     public function create(

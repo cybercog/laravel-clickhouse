@@ -19,8 +19,8 @@ use ClickHouseDB\Statement;
 final class MigrationRepository
 {
     public function __construct(
-        private Client $client,
-        private string $table,
+        private readonly Client $client,
+        private readonly string $table,
     ) {}
 
     /**

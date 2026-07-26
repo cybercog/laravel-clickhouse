@@ -19,7 +19,7 @@ use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 final class ClickhouseClientFactory
 {
     public function __construct(
-        private array $defaultConfig,
+        private readonly array $defaultConfig,
     ) {}
 
     /**

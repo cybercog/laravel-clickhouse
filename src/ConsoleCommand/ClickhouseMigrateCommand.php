@@ -37,8 +37,8 @@ final class ClickhouseMigrateCommand extends Command
                 {--step= : Number of migrations to run}';
 
     public function __construct(
-        private Migrator $migrator,
-        private AppConfigRepositoryInterface $appConfig,
+        private readonly Migrator $migrator,
+        private readonly AppConfigRepositoryInterface $appConfig,
     ) {
         parent::__construct();
     }
