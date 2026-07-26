@@ -49,7 +49,7 @@ services:
 
   clickhouse:
     container_name: laravel-clickhouse-clickhouse
-    image: yandex/clickhouse-server:21.8-alpine
+    image: clickhouse/clickhouse-server:21.9
     volumes:
       - ./.docker-volume-clickhouse:/var/lib/clickhouse
       - ./.docker/clickhouse/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
