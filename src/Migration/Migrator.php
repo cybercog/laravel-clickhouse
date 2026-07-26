@@ -28,9 +28,9 @@ use function in_array;
 final class Migrator
 {
     public function __construct(
-        private Client $client,
-        private MigrationRepository $repository,
-        private Filesystem $filesystem,
+        private readonly Client $client,
+        private readonly MigrationRepository $repository,
+        private readonly Filesystem $filesystem,
     ) {}
 
     /**
