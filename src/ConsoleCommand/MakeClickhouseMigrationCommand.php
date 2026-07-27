@@ -64,9 +64,9 @@ final class MakeClickhouseMigrationCommand extends Command
     }
 
     public function __construct(
-        private MigrationCreator $migrationCreator,
-        private Composer $composer,
-        private AppConfigRepositoryInterface $appConfigRepository,
+        private readonly MigrationCreator $migrationCreator,
+        private readonly Composer $composer,
+        private readonly AppConfigRepositoryInterface $appConfigRepository,
     ) {
         parent::__construct();
     }
