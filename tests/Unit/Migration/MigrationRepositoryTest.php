@@ -162,11 +162,12 @@ final class MigrationRepositoryTest extends AbstractTestCase
         $repository = $this->repository();
 
         $repository->all();
+        $repository->latest();
         $repository->total();
         $repository->getLastBatchNumber();
         $repository->find(self::MIGRATION_NAME);
 
-        self::assertCount(4, $this->selects);
+        self::assertCount(5, $this->selects);
 
         foreach ($this->selects as $select) {
             self::assertStringContainsString('FINAL', $select['sql']);
@@ -244,6 +245,17 @@ final class MigrationRepositoryTest extends AbstractTestCase
 
         self::assertSame(['a', 'b'], $this->repository()->all());
         self::assertSame(['table' => 'migrations'], $this->selects[0]['bindings']);
+    }
+
+    /**
+     * Deprecated, and covered until it is actually removed.
+     */
+    public function testLatestOrdersByBatchThenName(): void
+    {
+        $this->selectResult = $this->statementWithRows([['migration' => 'b'], ['migration' => 'a']]);
+
+        self::assertSame(['b', 'a'], $this->repository()->latest());
+        self::assertStringContainsString('ORDER BY batch DESC, migration DESC', $this->selects[0]['sql']);
     }
 
     public function testTotal(): void

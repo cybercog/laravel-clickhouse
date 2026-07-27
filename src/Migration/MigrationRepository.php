@@ -64,15 +64,35 @@ final class MigrationRepository
      */
     public function all(): array
     {
-        $rows = $this->selectRegistry(
+        return $this->pluckMigrations(
             <<<'SQL'
                 SELECT migration
                 FROM {table:Identifier}
                 FINAL
                 SQL,
-        )->rows();
+        );
+    }
 
-        return collect($rows)->pluck('migration')->all();
+    /**
+     * Get latest accepted migrations.
+     *
+     * @deprecated since 0.3, to be removed in the next major release. Nothing in this
+     *             package has called it since 0.1: the ordering exists to feed a
+     *             rollback, and migrations here are forward-only by design. Use `all()`,
+     *             which returns the same set.
+     *
+     * @return list<string>
+     */
+    public function latest(): array
+    {
+        return $this->pluckMigrations(
+            <<<'SQL'
+                SELECT migration
+                FROM {table:Identifier}
+                FINAL
+                ORDER BY batch DESC, migration DESC
+                SQL,
+        );
     }
 
     public function getNextBatchNumber(): int
@@ -203,6 +223,17 @@ final class MigrationRepository
         )->fetchOne('engine');
 
         return $engine === null ? null : (string) $engine;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pluckMigrations(
+        string $sql,
+    ): array {
+        $rows = $this->selectRegistry($sql)->rows();
+
+        return collect($rows)->pluck('migration')->all();
     }
 
     /**

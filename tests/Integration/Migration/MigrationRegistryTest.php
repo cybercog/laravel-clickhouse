@@ -84,6 +84,28 @@ final class MigrationRegistryTest extends AbstractIntegrationTestCase
         self::assertSame([self::MIGRATION_NAME], $repository->all());
     }
 
+    /**
+     * Deprecated, and covered until it is actually removed.
+     */
+    public function testLatestOrdersByBatchThenName(): void
+    {
+        $repository = $this->singleNodeRepository();
+        $repository->createMigrationRegistryTable();
+
+        $repository->add('2026_01_01_000000_first', 1);
+        $repository->add('2026_01_02_000000_second', 2);
+        $repository->add('2026_01_03_000000_third', 2);
+
+        self::assertSame(
+            [
+                '2026_01_03_000000_third',
+                '2026_01_02_000000_second',
+                '2026_01_01_000000_first',
+            ],
+            $repository->latest(),
+        );
+    }
+
     public function testExistsIsFalseBeforeTheRegistryIsCreated(): void
     {
         self::assertFalse($this->singleNodeRepository()->exists());
