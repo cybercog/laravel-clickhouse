@@ -15,7 +15,6 @@ namespace Cog\Tests\Laravel\Clickhouse\Unit;
 
 use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 use Cog\Laravel\Clickhouse\Migration\Migrator;
-use Cog\Laravel\Clickhouse\Migration\RegistryTopology;
 use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
 
 final class ClickhouseServiceProviderTest extends AbstractTestCase
@@ -33,7 +32,6 @@ final class ClickhouseServiceProviderTest extends AbstractTestCase
             config('clickhouse.migrations.replica_path'),
         );
         self::assertSame('{replica}', config('clickhouse.migrations.replica_name'));
-        self::assertSame('auto', config('clickhouse.migrations.insert_quorum'));
     }
 
     /**
@@ -49,25 +47,6 @@ final class ClickhouseServiceProviderTest extends AbstractTestCase
     public function testMigratorResolvesWithDefaultConfig(): void
     {
         self::assertInstanceOf(Migrator::class, $this->app->get(Migrator::class));
-    }
-
-    public function testTopologyIsBuiltFromConfig(): void
-    {
-        config(
-            [
-                'clickhouse.connection.options.database' => 'analytics',
-                'clickhouse.migrations.table' => 'migration_registry',
-                'clickhouse.migrations.cluster' => 'main',
-                'clickhouse.migrations.replicated' => true,
-            ],
-        );
-
-        $topology = $this->app->get(RegistryTopology::class);
-
-        self::assertSame('migration_registry', $topology->getTable());
-        self::assertSame('analytics', $topology->getDatabase());
-        self::assertSame('main', $topology->getCluster());
-        self::assertTrue($topology->isReplicated());
     }
 
     /**

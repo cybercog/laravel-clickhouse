@@ -55,15 +55,14 @@ abstract class AbstractClickhouseMigration
         return $this->databaseName;
     }
 
-    public function getClusterName(): ?string
-    {
-        return $this->clusterName;
-    }
-
     /**
-     * The whole clause, not just the name: a migration written against `{cluster}`
-     * emits a literal `ON CLUSTER {cluster}` wherever no cluster is configured,
-     * because the driver skips `null` bindings and leaves the placeholder in place.
+     * The whole clause, not just the name — interpolated into the SQL rather than
+     * bound, so that it collapses to nothing on a single-node deployment:
+     *
+     *     "CREATE TABLE events {$this->onCluster()} (id UInt32) ENGINE = MergeTree"
+     *
+     * A migration written against a `{cluster}` binding would emit a bare
+     * `ON CLUSTER` wherever no cluster is configured.
      */
     public function onCluster(): string
     {
@@ -72,23 +71,6 @@ abstract class AbstractClickhouseMigration
         }
 
         return 'ON CLUSTER ' . Identifier::quote($this->clusterName);
-    }
-
-    /**
-     * @param array<string, mixed> $extraBindings
-     * @return array<string, mixed>
-     */
-    public function getBindings(
-        array $extraBindings = [],
-    ): array {
-        return array_merge(
-            [
-                'database' => $this->databaseName,
-                'cluster' => $this->clusterName ?? '',
-                'on_cluster' => $this->onCluster(),
-            ],
-            $extraBindings,
-        );
     }
 
     private static function normaliseClusterName(

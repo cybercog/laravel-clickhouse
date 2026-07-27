@@ -69,12 +69,5 @@ return [
         'replicated' => (bool) env('CLICKHOUSE_MIGRATION_REPLICATED', false),
         'replica_path' => env('CLICKHOUSE_MIGRATION_REPLICA_PATH', '/clickhouse/tables/{database}/{table}'),
         'replica_name' => env('CLICKHOUSE_MIGRATION_REPLICA_NAME', '{replica}'),
-
-        /*
-        | 'auto' (a majority of replicas) or a non-negative integer. Zero disables
-        | quorum writes and, with them, `select_sequential_consistency` — a migrate run
-        | against a lagging replica may then re-apply migrations. Requires ClickHouse 22.8+.
-        */
-        'insert_quorum' => env('CLICKHOUSE_MIGRATION_INSERT_QUORUM', 'auto'),
     ],
 ];

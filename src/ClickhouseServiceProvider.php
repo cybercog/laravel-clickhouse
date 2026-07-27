@@ -20,7 +20,6 @@ use Cog\Laravel\Clickhouse\Factory\ClickhouseClientFactory;
 use Cog\Laravel\Clickhouse\Migration\MigrationCreator;
 use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
 use Cog\Laravel\Clickhouse\Migration\Migrator;
-use Cog\Laravel\Clickhouse\Migration\RegistryGrammar;
 use Cog\Laravel\Clickhouse\Migration\RegistryTopology;
 use Illuminate\Contracts\Config\Repository as AppConfigRepositoryInterface;
 use Illuminate\Filesystem\Filesystem;
@@ -51,18 +50,6 @@ final class ClickhouseServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
-            RegistryTopology::class,
-            static function (Application $app): RegistryTopology {
-                $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
-
-                return RegistryTopology::fromConfig(
-                    $appConfigRepository->get('clickhouse.migrations', []),
-                    (string) $appConfigRepository->get('clickhouse.connection.options.database', 'default'),
-                );
-            },
-        );
-
-        $this->app->bind(
             Migrator::class,
             static function (Application $app): Migrator {
                 $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
@@ -70,16 +57,14 @@ final class ClickhouseServiceProvider extends ServiceProvider
 
                 $client = self::createMigrationClient($appConfigRepository);
 
-                $repository = new MigrationRepository(
-                    $client,
-                    new RegistryGrammar(
-                        $app->get(RegistryTopology::class),
-                    ),
+                $topology = RegistryTopology::fromConfig(
+                    $appConfigRepository->get('clickhouse.migrations', []),
+                    (string) $appConfigRepository->get('clickhouse.connection.options.database', 'default'),
                 );
 
                 return new Migrator(
                     $client,
-                    $repository,
+                    new MigrationRepository($client, $topology),
                     $filesystem,
                 );
             },
@@ -115,7 +100,7 @@ final class ClickhouseServiceProvider extends ServiceProvider
         $connectionConfig = $appConfigRepository->get('clickhouse.connection', []);
         $connectionConfig['options'] ??= [];
         $connectionConfig['options']['timeout'] = (int) (
-            $appConfigRepository->get('clickhouse.migrations.timeout') ?: self::DEFAULT_MIGRATION_TIMEOUT
+            $appConfigRepository->get('clickhouse.migrations.timeout') ?? self::DEFAULT_MIGRATION_TIMEOUT
         );
 
         $clickhouseClientFactory = new ClickhouseClientFactory($connectionConfig);

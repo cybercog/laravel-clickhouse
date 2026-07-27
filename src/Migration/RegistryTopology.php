@@ -15,7 +15,6 @@ namespace Cog\Laravel\Clickhouse\Migration;
 
 use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 
-use function is_int;
 use function is_string;
 
 /**
@@ -34,8 +33,6 @@ final class RegistryTopology
 
     private const REPLICATED_ENGINE = 'ReplicatedReplacingMergeTree';
 
-    private readonly int|string $insertQuorum;
-
     /**
      * @throws ClickhouseConfigException
      */
@@ -46,7 +43,6 @@ final class RegistryTopology
         private readonly bool $isReplicated = false,
         private readonly string $replicaPath = self::DEFAULT_REPLICA_PATH,
         private readonly string $replicaName = self::DEFAULT_REPLICA_NAME,
-        int|string $insertQuorum = 'auto',
     ) {
         Identifier::ensureValid($table, 'migration registry table name');
         Identifier::ensureValid($database, 'database name');
@@ -76,8 +72,6 @@ final class RegistryTopology
                 );
             }
         }
-
-        $this->insertQuorum = self::normaliseInsertQuorum($insertQuorum);
     }
 
     /**
@@ -102,7 +96,6 @@ final class RegistryTopology
             isReplicated: self::toBool($config['replicated'] ?? false),
             replicaPath: (string) ($config['replica_path'] ?? self::DEFAULT_REPLICA_PATH),
             replicaName: (string) ($config['replica_name'] ?? self::DEFAULT_REPLICA_NAME),
-            insertQuorum: $config['insert_quorum'] ?? 'auto',
         );
     }
 
@@ -131,6 +124,9 @@ final class RegistryTopology
         return $this->isReplicated;
     }
 
+    /**
+     * The bare engine name, as `system.tables` reports it.
+     */
     public function getEngine(): string
     {
         return $this->isReplicated
@@ -139,34 +135,47 @@ final class RegistryTopology
     }
 
     /**
+     * The engine with its arguments, as `CREATE TABLE` takes it.
+     *
      * `{database}` and `{table}` are substituted here; every other brace token is
-     * left untouched so that ClickHouse expands it as a macro on each node.
+     * left untouched so that ClickHouse expands it as a macro on each node. That is
+     * also why the path and the name are interpolated rather than bound — ClickHouse
+     * does not expand macros passed through query parameters.
      */
-    public function getReplicaPath(): string
+    public function getEngineDefinition(): string
     {
-        return strtr(
+        if ($this->isReplicated === false) {
+            return self::ENGINE;
+        }
+
+        $replicaPath = strtr(
             $this->replicaPath,
             [
                 '{database}' => $this->database,
                 '{table}' => $this->table,
             ],
         );
-    }
 
-    public function getReplicaName(): string
-    {
-        return $this->replicaName;
-    }
-
-    public function getInsertQuorum(): int|string
-    {
-        return $this->insertQuorum;
+        return sprintf(
+            "%s('%s', '%s')",
+            self::REPLICATED_ENGINE,
+            $replicaPath,
+            $this->replicaName,
+        );
     }
 
     /**
-     * The path and the replica name are interpolated into string literals, because
-     * ClickHouse does not expand macros passed through query parameters.
-     *
+     * `ON CLUSTER` accepts no query parameter, so the name is validated as an
+     * identifier and quoted instead.
+     */
+    public function getOnClusterClause(): string
+    {
+        return $this->cluster === null
+            ? ''
+            : ' ON CLUSTER ' . Identifier::quote($this->cluster);
+    }
+
+    /**
      * @throws ClickhouseConfigException
      */
     private static function ensureSafeLiteral(
@@ -184,30 +193,6 @@ final class RegistryTopology
                 "The migration registry {$subject} '{$literal}' contains a quote, a backslash or a line break.",
             );
         }
-    }
-
-    /**
-     * @throws ClickhouseConfigException
-     */
-    private static function normaliseInsertQuorum(
-        int|string $insertQuorum,
-    ): int|string {
-        if ($insertQuorum === 'auto') {
-            return 'auto';
-        }
-
-        if (is_int($insertQuorum) && $insertQuorum >= 0) {
-            return $insertQuorum;
-        }
-
-        if (is_string($insertQuorum) && preg_match('/^\d+$/', $insertQuorum) === 1) {
-            return (int) $insertQuorum;
-        }
-
-        throw new ClickhouseConfigException(
-            "Invalid migration registry insert quorum '{$insertQuorum}'. "
-            . "It must be 'auto' or a non-negative integer.",
-        );
     }
 
     private static function toBool(

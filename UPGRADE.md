@@ -37,7 +37,6 @@ Or add them by hand to `config/clickhouse.php` under `migrations`:
 'replicated' => (bool) env('CLICKHOUSE_MIGRATION_REPLICATED', false),
 'replica_path' => env('CLICKHOUSE_MIGRATION_REPLICA_PATH', '/clickhouse/tables/{database}/{table}'),
 'replica_name' => env('CLICKHOUSE_MIGRATION_REPLICA_NAME', '{replica}'),
-'insert_quorum' => env('CLICKHOUSE_MIGRATION_INSERT_QUORUM', 'auto'),
 ```
 
 ### Behaviour changes
@@ -72,7 +71,7 @@ instance, and a fresh ClickHouse client with it, on every resolution.
 
 ### API changes
 
-`MigrationRepository::__construct()` takes a `RegistryGrammar` instead of the registry table name:
+`MigrationRepository::__construct()` takes a `RegistryTopology` instead of the registry table name:
 
 ```php
 // 0.2
@@ -81,18 +80,18 @@ new MigrationRepository($client, config('clickhouse.migrations.table'));
 // 0.3
 new MigrationRepository(
     $client,
-    new RegistryGrammar(
-        RegistryTopology::fromConfig(
-            config('clickhouse.migrations'),
-            config('clickhouse.connection.options.database'),
-        ),
+    RegistryTopology::fromConfig(
+        config('clickhouse.migrations'),
+        config('clickhouse.connection.options.database'),
     ),
 );
 ```
 
-The class is not bound in the container and is built by the `Migrator`, so this only affects code
-that constructed it directly. Everything else is additive: `AbstractClickhouseMigration` gained an
-optional third constructor argument and new methods, and nothing was removed.
+Neither class is bound in the container — the `Migrator` builds both — so this only affects code
+that constructed the repository directly.
+
+`AbstractClickhouseMigration` gained an optional third constructor argument (`$clusterName`) and one
+method, `onCluster()`. Nothing was removed.
 
 ### Optional: enabling cluster mode
 
@@ -116,6 +115,15 @@ Two rules the configuration cannot infer for you:
 - **`replica_path` must not contain `{shard}`.** The registry is replicated, never sharded — a
   `{shard}` in the path gives each shard its own view of which migrations have been applied, which
   is the bug cluster mode exists to fix. This one *is* rejected for you.
+
+**Writing migrations that work on both topologies.** `onCluster()` returns the whole clause, so it
+collapses to nothing where no cluster is configured. Interpolate it — do not pass it as a binding:
+
+```php
+$this->clickhouseClient->write(
+    "CREATE TABLE events {$this->onCluster()} (id UInt32) ENGINE = MergeTree ORDER BY id",
+);
+```
 
 **Converting an existing registry.** A registry created before cluster mode was enabled is a plain
 `ReplacingMergeTree` and must be converted by hand, on the node that owns it, before enabling the

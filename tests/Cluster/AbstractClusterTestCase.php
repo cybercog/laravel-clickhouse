@@ -24,13 +24,15 @@ use function count;
  * replica names unique cluster-wide.
  *
  *   docker compose -f compose.yml -f compose.cluster.yml up -d
+ *
+ * `CLICKHOUSE_CLUSTER_NODES` holds one entry per node, as `host` or `host:port`.
  */
 abstract class AbstractClusterTestCase extends AbstractIntegrationTestCase
 {
     protected function setUp(): void
     {
         foreach ($this->nodes() as $node) {
-            $this->skipUnlessReachable($node, $this->port());
+            $this->skipUnlessReachable(...$this->splitNode($node));
         }
 
         parent::setUp();
@@ -85,14 +87,12 @@ abstract class AbstractClusterTestCase extends AbstractIntegrationTestCase
 
     protected function clusterTopology(
         string $table,
-        int|string $insertQuorum = 'auto',
     ): RegistryTopology {
         return new RegistryTopology(
             table: $table,
             database: $this->database(),
             cluster: $this->clusterName(),
             isReplicated: true,
-            insertQuorum: $insertQuorum,
         );
     }
 

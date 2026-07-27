@@ -15,7 +15,6 @@ namespace Cog\Tests\Laravel\Clickhouse\Integration\Migration;
 
 use Cog\Laravel\Clickhouse\Exception\ClickhouseRegistryEngineMismatchException;
 use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
-use Cog\Laravel\Clickhouse\Migration\RegistryGrammar;
 use Cog\Laravel\Clickhouse\Migration\RegistryTopology;
 use Cog\Tests\Laravel\Clickhouse\Integration\AbstractIntegrationTestCase;
 
@@ -152,10 +151,7 @@ final class MigrationRegistryTest extends AbstractIntegrationTestCase
             "CREATE TABLE `{$table}` (migration String, batch UInt32, applied_at DateTime DEFAULT now()) ENGINE = MergeTree ORDER BY migration",
         );
 
-        $repository = new MigrationRepository(
-            $client,
-            new RegistryGrammar($this->topology($table)),
-        );
+        $repository = new MigrationRepository($client, $this->topology($table));
 
         $this->expectException(ClickhouseRegistryEngineMismatchException::class);
 

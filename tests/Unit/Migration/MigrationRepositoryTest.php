@@ -17,7 +17,6 @@ use ClickHouseDB\Client;
 use ClickHouseDB\Statement;
 use Cog\Laravel\Clickhouse\Exception\ClickhouseRegistryEngineMismatchException;
 use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
-use Cog\Laravel\Clickhouse\Migration\RegistryGrammar;
 use Cog\Laravel\Clickhouse\Migration\RegistryTopology;
 use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -28,125 +27,188 @@ final class MigrationRepositoryTest extends AbstractTestCase
 
     private Client&MockObject $client;
 
-    private RegistryGrammar $grammar;
+    /**
+     * @var list<array{sql: string, bindings: array<string, mixed>}>
+     */
+    private array $writes = [];
+
+    /**
+     * @var list<array{sql: string, bindings: array<string, mixed>}>
+     */
+    private array $selects = [];
+
+    private ?Statement $selectResult = null;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->writes = [];
+        $this->selects = [];
+        $this->selectResult = null;
+
         $this->client = $this->createMock(Client::class);
-        $this->grammar = new RegistryGrammar(
-            new RegistryTopology(
-                table: 'migrations',
-                database: 'analytics',
-            ),
+
+        $this->client
+            ->method('write')
+            ->willReturnCallback(
+                function (string $sql, array $bindings = []): Statement {
+                    $this->writes[] = ['sql' => $sql, 'bindings' => $bindings];
+
+                    return $this->createMock(Statement::class);
+                },
+            );
+
+        $this->client
+            ->method('select')
+            ->willReturnCallback(
+                function (string $sql, array $bindings = []): Statement {
+                    $this->selects[] = ['sql' => $sql, 'bindings' => $bindings];
+
+                    return $this->selectResult ?? $this->createMock(Statement::class);
+                },
+            );
+    }
+
+    public function testCreateTableOnASingleNode(): void
+    {
+        $this->repository()->createMigrationRegistryTable();
+
+        self::assertSame(
+            <<<'SQL'
+                CREATE TABLE IF NOT EXISTS `migrations` (
+                    migration String,
+                    batch UInt32,
+                    applied_at DateTime DEFAULT now()
+                )
+                ENGINE = ReplacingMergeTree
+                ORDER BY migration
+                SQL,
+            $this->writes[0]['sql'],
         );
     }
 
-    public function testCreateMigrationRegistryTableIssuesGrammarStatement(): void
+    /**
+     * The DDL carries no bindings: `ON CLUSTER` takes no query parameter, and neither
+     * does the replica name — ClickHouse does not expand macros passed as parameters,
+     * so `param_replica={replica}` makes two nodes claim one replica.
+     */
+    public function testCreateTableOnACluster(): void
     {
-        $expected = $this->grammar->createTable();
+        $this->repository($this->clusteredTopology())->createMigrationRegistryTable();
 
-        $this->client
-            ->expects(self::once())
-            ->method('write')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($this->createMock(Statement::class));
+        self::assertSame(
+            <<<'SQL'
+                CREATE TABLE IF NOT EXISTS `migrations` ON CLUSTER `main` (
+                    migration String,
+                    batch UInt32,
+                    applied_at DateTime DEFAULT now()
+                )
+                ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/analytics/migrations', '{replica}')
+                ORDER BY migration
+                SQL,
+            $this->writes[0]['sql'],
+        );
 
-        $this->repository()->createMigrationRegistryTable();
-    }
-
-    public function testAllIssuesGrammarStatementAndPlucksMigrations(): void
-    {
-        $expected = $this->grammar->selectAllMigrations();
-
-        $this->client
-            ->expects(self::once())
-            ->method('select')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn(
-                $this->statementWithRows(
-                    [
-                        ['migration' => 'a'],
-                        ['migration' => 'b'],
-                    ],
-                ),
-            );
-
-        self::assertSame(['a', 'b'], $this->repository()->all());
-    }
-
-    public function testLatestIssuesGrammarStatement(): void
-    {
-        $expected = $this->grammar->selectLatestMigrations();
-
-        $this->client
-            ->expects(self::once())
-            ->method('select')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($this->statementWithRows([['migration' => 'b'], ['migration' => 'a']]));
-
-        self::assertSame(['b', 'a'], $this->repository()->latest());
+        self::assertSame([], $this->writes[0]['bindings']);
     }
 
     /**
-     * D5: writes go through a parameterised `INSERT`, not `Client::insert()`, so the
-     * quorum setting can ride along on the statement.
+     * Writes go through `write()`, not `Client::insert()`, so the quorum setting can
+     * ride along on the statement.
      */
-    public function testAddIssuesParameterisedInsert(): void
+    public function testAddIssuesAParameterisedInsert(): void
     {
-        $expected = $this->grammar->insertMigration(self::MIGRATION_NAME, 4);
-
-        $this->client
-            ->expects(self::once())
-            ->method('write')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($this->createMock(Statement::class));
-
         $this->client
             ->expects(self::never())
             ->method('insert');
 
         $this->repository()->add(self::MIGRATION_NAME, 4);
+
+        self::assertSame(
+            <<<'SQL'
+                INSERT INTO {table:Identifier} (migration, batch)
+                VALUES ({migration:String}, {batch:UInt32})
+                SQL,
+            $this->writes[0]['sql'],
+        );
+
+        self::assertSame(
+            [
+                'table' => 'migrations',
+                'migration' => self::MIGRATION_NAME,
+                'batch' => 4,
+            ],
+            $this->writes[0]['bindings'],
+        );
+    }
+
+    public function testAddTakesAQuorumOnAReplicatedRegistry(): void
+    {
+        $this->repository($this->replicatedTopology())->add(self::MIGRATION_NAME, 4);
+
+        self::assertStringContainsString(
+            "SETTINGS insert_quorum = 'auto'",
+            $this->lastWrite()['sql'],
+        );
     }
 
     /**
-     * D5: `select_sequential_consistency` caps a read at the quorum-committed point
-     * but never waits for the connected replica to get there, so reads of the registry
-     * drain the replication queue first.
+     * `ReplacingMergeTree` returns pre-merge duplicates without it, so `total()`
+     * over-counts and a migration applied twice shows up twice.
      */
-    public function testReadsCatchTheReplicaUpFirst(): void
+    public function testEveryRegistryReadIsFinal(): void
     {
-        $grammar = $this->replicatedGrammar();
-        $expected = $grammar->syncReplica();
+        $repository = $this->repository();
 
-        $this->client
-            ->expects(self::once())
-            ->method('write')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($this->createMock(Statement::class));
+        $repository->all();
+        $repository->latest();
+        $repository->total();
+        $repository->getLastBatchNumber();
+        $repository->find(self::MIGRATION_NAME);
 
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithRows([['migration' => 'a']]));
+        self::assertCount(5, $this->selects);
 
-        $repository = new MigrationRepository($this->client, $grammar);
+        foreach ($this->selects as $select) {
+            self::assertStringContainsString('FINAL', $select['sql']);
+            self::assertStringNotContainsString('select_sequential_consistency', $select['sql']);
+        }
+    }
 
-        self::assertSame(['a'], $repository->all());
-        self::assertSame(['a'], $repository->latest());
+    public function testRegistryReadsAreSequentiallyConsistentWhenReplicated(): void
+    {
+        $repository = $this->repository($this->replicatedTopology());
+
+        $repository->all();
+        $repository->total();
+
+        foreach ($this->selects as $select) {
+            self::assertStringContainsString('SETTINGS select_sequential_consistency = 1', $select['sql']);
+        }
+    }
+
+    /**
+     * `select_sequential_consistency` caps a read at the quorum-committed point but
+     * never waits for the connected replica to get there, so reads of the registry
+     * drain the replication queue first — once per instance.
+     */
+    public function testReadsCatchTheReplicaUpOnce(): void
+    {
+        $repository = $this->repository($this->replicatedTopology());
+
+        $repository->all();
+        $repository->latest();
+
+        self::assertCount(1, $this->writes);
+        self::assertSame('SYSTEM SYNC REPLICA {table:Identifier}', $this->writes[0]['sql']);
+        self::assertSame(['table' => 'migrations'], $this->writes[0]['bindings']);
     }
 
     public function testReadsDoNotCatchUpOnANonReplicatedTopology(): void
     {
-        $this->client
-            ->expects(self::never())
-            ->method('write');
+        $this->repository()->all();
 
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithRows([]));
-
-        self::assertSame([], $this->repository()->all());
+        self::assertSame([], $this->writes);
     }
 
     /**
@@ -155,86 +217,71 @@ final class MigrationRepositoryTest extends AbstractTestCase
      */
     public function testExistsAndGetEngineDoNotCatchTheReplicaUp(): void
     {
-        $this->client
-            ->expects(self::never())
-            ->method('write');
+        $repository = $this->repository($this->replicatedTopology());
 
-        $statement = $this->createMock(Statement::class);
-        $statement
-            ->method('fetchOne')
-            ->willReturn(null);
+        $repository->exists();
+        $repository->getEngine();
 
-        $this->client
-            ->method('select')
-            ->willReturn($statement);
+        self::assertSame([], $this->writes);
 
-        $repository = new MigrationRepository($this->client, $this->replicatedGrammar());
-
-        self::assertFalse($repository->exists());
-        self::assertNull($repository->getEngine());
+        foreach ($this->selects as $select) {
+            self::assertStringNotContainsString('select_sequential_consistency', $select['sql']);
+        }
     }
 
-    public function testTotalIssuesGrammarStatement(): void
+    public function testAllPlucksMigrations(): void
     {
-        $expected = $this->grammar->selectTotal();
+        $this->selectResult = $this->statementWithRows(
+            [
+                ['migration' => 'a'],
+                ['migration' => 'b'],
+            ],
+        );
 
-        $this->client
-            ->expects(self::once())
-            ->method('select')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($this->statementWithFetchOne('count', '7'));
+        self::assertSame(['a', 'b'], $this->repository()->all());
+        self::assertSame(['table' => 'migrations'], $this->selects[0]['bindings']);
+    }
+
+    public function testLatestOrdersByBatchThenName(): void
+    {
+        $this->selectResult = $this->statementWithRows([['migration' => 'b'], ['migration' => 'a']]);
+
+        self::assertSame(['b', 'a'], $this->repository()->latest());
+        self::assertStringContainsString('ORDER BY batch DESC, migration DESC', $this->selects[0]['sql']);
+    }
+
+    public function testTotal(): void
+    {
+        $this->selectResult = $this->statementWithFetchOne('count', '7');
 
         self::assertSame(7, $this->repository()->total());
     }
 
-    public function testGetLastBatchNumberIssuesGrammarStatement(): void
-    {
-        $expected = $this->grammar->selectLastBatchNumber();
-
-        $this->client
-            ->expects(self::once())
-            ->method('select')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($this->statementWithFetchOne('batch', '3'));
-
-        self::assertSame(3, $this->repository()->getLastBatchNumber());
-    }
-
     public function testGetNextBatchNumberIncrementsLastBatch(): void
     {
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithFetchOne('batch', '3'));
+        $this->selectResult = $this->statementWithFetchOne('batch', '3');
 
+        self::assertSame(3, $this->repository()->getLastBatchNumber());
         self::assertSame(4, $this->repository()->getNextBatchNumber());
     }
 
     public function testGetNextBatchNumberOnEmptyRegistry(): void
     {
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithFetchOne('batch', null));
+        $this->selectResult = $this->statementWithFetchOne('batch', null);
 
         self::assertSame(1, $this->repository()->getNextBatchNumber());
     }
 
-    public function testExistsIssuesGrammarStatement(): void
+    public function testExists(): void
     {
-        $expected = $this->grammar->existsTable();
-
-        $this->client
-            ->expects(self::once())
-            ->method('select')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($this->statementWithFetchOne('result', '1'));
+        $this->selectResult = $this->statementWithFetchOne('result', '1');
 
         self::assertTrue($this->repository()->exists());
+        self::assertSame('EXISTS TABLE {table:Identifier}', $this->selects[0]['sql']);
     }
 
-    public function testFindIssuesGrammarStatement(): void
+    public function testFind(): void
     {
-        $expected = $this->grammar->selectMigration(self::MIGRATION_NAME);
-
         $row = [
             'migration' => self::MIGRATION_NAME,
             'batch' => 1,
@@ -246,95 +293,117 @@ final class MigrationRepositoryTest extends AbstractTestCase
             ->method('fetchOne')
             ->willReturn($row);
 
-        $this->client
-            ->expects(self::once())
-            ->method('select')
-            ->with($expected->sql, $expected->bindings)
-            ->willReturn($statement);
+        $this->selectResult = $statement;
 
         self::assertSame($row, $this->repository()->find(self::MIGRATION_NAME));
+        self::assertSame(
+            [
+                'table' => 'migrations',
+                'migration' => self::MIGRATION_NAME,
+            ],
+            $this->selects[0]['bindings'],
+        );
+    }
+
+    public function testGetEngineReadsTheLocalSystemTable(): void
+    {
+        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplacingMergeTree');
+
+        self::assertSame('ReplacingMergeTree', $this->repository()->getEngine());
+        self::assertStringContainsString('FROM system.tables', $this->selects[0]['sql']);
+        self::assertSame(
+            [
+                'database' => 'analytics',
+                'table' => 'migrations',
+            ],
+            $this->selects[0]['bindings'],
+        );
     }
 
     public function testGetEngineReturnsNullWhenRegistryIsAbsent(): void
     {
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithFetchOne('engine', null));
+        $this->selectResult = $this->statementWithFetchOne('engine', null);
 
         self::assertNull($this->repository()->getEngine());
     }
 
     public function testEnsureEngineMatchesTopologyPassesForMatchingEngine(): void
     {
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithFetchOne('engine', 'ReplacingMergeTree'));
+        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplacingMergeTree');
 
-        $repository = $this->repository();
-        $repository->ensureEngineMatchesTopology();
+        $this->repository()->ensureEngineMatchesTopology();
 
-        self::assertSame('ReplacingMergeTree', $repository->getEngine());
+        self::assertCount(1, $this->selects);
     }
 
     public function testEnsureEngineMatchesTopologyPassesForAbsentRegistry(): void
     {
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithFetchOne('engine', null));
+        $this->selectResult = $this->statementWithFetchOne('engine', null);
 
-        $repository = $this->repository();
-        $repository->ensureEngineMatchesTopology();
+        $this->repository($this->replicatedTopology())->ensureEngineMatchesTopology();
 
-        self::assertNull($repository->getEngine());
+        self::assertCount(1, $this->selects);
     }
 
     /**
      * The upgrade trap: a registry created before cluster mode was enabled stays a
      * plain `ReplacingMergeTree` on the node that owns it, while `CREATE TABLE IF
      * NOT EXISTS ... ON CLUSTER` silently creates empty replicated tables elsewhere.
-     * Reproduced on a 2x2 cluster running 24.8.
      */
     public function testEnsureEngineMatchesTopologyRejectsNonReplicatedRegistry(): void
     {
-        $repository = new MigrationRepository($this->client, $this->replicatedGrammar());
-
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithFetchOne('engine', 'ReplacingMergeTree'));
+        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplacingMergeTree');
 
         $this->expectException(ClickhouseRegistryEngineMismatchException::class);
         $this->expectExceptionMessageMatches('/ReplacingMergeTree/');
         $this->expectExceptionMessageMatches('/ReplicatedReplacingMergeTree/');
 
-        $repository->ensureEngineMatchesTopology();
+        $this->repository($this->replicatedTopology())->ensureEngineMatchesTopology();
     }
 
     public function testEnsureEngineMatchesTopologyRejectsReplicatedRegistryOnSingleNodeTopology(): void
     {
-        $this->client
-            ->method('select')
-            ->willReturn($this->statementWithFetchOne('engine', 'ReplicatedReplacingMergeTree'));
+        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplicatedReplacingMergeTree');
 
         $this->expectException(ClickhouseRegistryEngineMismatchException::class);
 
         $this->repository()->ensureEngineMatchesTopology();
     }
 
-    private function repository(): MigrationRepository
-    {
-        return new MigrationRepository($this->client, $this->grammar);
+    private function repository(
+        ?RegistryTopology $topology = null,
+    ): MigrationRepository {
+        return new MigrationRepository(
+            $this->client,
+            $topology ?? new RegistryTopology(table: 'migrations', database: 'analytics'),
+        );
     }
 
-    private function replicatedGrammar(): RegistryGrammar
+    private function replicatedTopology(): RegistryTopology
     {
-        return new RegistryGrammar(
-            new RegistryTopology(
-                table: 'migrations',
-                database: 'analytics',
-                cluster: 'main',
-                isReplicated: true,
-            ),
+        return new RegistryTopology(
+            table: 'migrations',
+            database: 'analytics',
+            isReplicated: true,
         );
+    }
+
+    private function clusteredTopology(): RegistryTopology
+    {
+        return new RegistryTopology(
+            table: 'migrations',
+            database: 'analytics',
+            cluster: 'main',
+            isReplicated: true,
+        );
+    }
+
+    /**
+     * @return array{sql: string, bindings: array<string, mixed>}
+     */
+    private function lastWrite(): array
+    {
+        return $this->writes[array_key_last($this->writes)];
     }
 
     /**

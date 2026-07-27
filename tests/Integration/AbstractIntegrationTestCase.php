@@ -16,7 +16,6 @@ namespace Cog\Tests\Laravel\Clickhouse\Integration;
 use ClickHouseDB\Client;
 use Cog\Laravel\Clickhouse\Factory\ClickhouseClientFactory;
 use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
-use Cog\Laravel\Clickhouse\Migration\RegistryGrammar;
 use Cog\Laravel\Clickhouse\Migration\RegistryTopology;
 use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
 
@@ -31,7 +30,7 @@ abstract class AbstractIntegrationTestCase extends AbstractTestCase
     {
         parent::setUp();
 
-        $this->skipUnlessReachable($this->host(), $this->port());
+        $this->skipUnlessReachable(...$this->splitNode($this->host()));
     }
 
     protected function tearDown(): void
@@ -62,14 +61,38 @@ abstract class AbstractIntegrationTestCase extends AbstractTestCase
         return (string) env('CLICKHOUSE_DATABASE', 'default');
     }
 
+    /**
+     * Accepts `host` or `host:port`. The port form is what lets the suites run
+     * from outside the compose network, where every node is on 127.0.0.1 and
+     * only the published port tells them apart.
+     *
+     * @return array{string, int}
+     */
+    protected function splitNode(
+        string $node,
+    ): array {
+        $separator = strrpos($node, ':');
+
+        if ($separator === false) {
+            return [$node, $this->port()];
+        }
+
+        return [
+            substr($node, 0, $separator),
+            (int) substr($node, $separator + 1),
+        ];
+    }
+
     protected function client(
-        ?string $host = null,
+        ?string $node = null,
         int $timeout = 60,
     ): Client {
+        [$host, $port] = $this->splitNode($node ?? $this->host());
+
         $factory = new ClickhouseClientFactory(
             [
-                'host' => $host ?? $this->host(),
-                'port' => $this->port(),
+                'host' => $host,
+                'port' => $port,
                 'username' => (string) env('CLICKHOUSE_USER', 'test'),
                 'password' => (string) env('CLICKHOUSE_PASSWORD', ''),
                 'options' => [
@@ -89,7 +112,7 @@ abstract class AbstractIntegrationTestCase extends AbstractTestCase
     ): MigrationRepository {
         return new MigrationRepository(
             $client ?? $this->client(),
-            new RegistryGrammar($topology),
+            $topology,
         );
     }
 

@@ -62,26 +62,40 @@ final class RegistryTopologyTest extends AbstractTestCase
         self::assertSame('ReplicatedReplacingMergeTree', $topology->getEngine());
     }
 
-    /**
-     * D3: the grammar substitutes `{database}` and `{table}` itself and leaves every
-     * other brace token for ClickHouse to expand.
-     */
-    public function testReplicaPathSubstitutesDatabaseAndTableOnly(): void
+    public function testOnClusterClause(): void
+    {
+        self::assertSame(
+            '',
+            (new RegistryTopology(table: 'migrations', database: 'analytics'))
+                ->getOnClusterClause(),
+        );
+
+        self::assertSame(
+            ' ON CLUSTER `main`',
+            (new RegistryTopology(
+                table: 'migrations',
+                database: 'analytics',
+                cluster: 'main',
+                isReplicated: true,
+            ))->getOnClusterClause(),
+        );
+    }
+
+    public function testEngineDefinitionOnASingleNode(): void
     {
         $topology = new RegistryTopology(
             table: 'migrations',
             database: 'analytics',
-            isReplicated: true,
-            replicaPath: '/clickhouse/tables/{database}/{table}',
         );
 
-        self::assertSame(
-            '/clickhouse/tables/analytics/migrations',
-            $topology->getReplicaPath(),
-        );
+        self::assertSame('ReplacingMergeTree', $topology->getEngineDefinition());
     }
 
-    public function testReplicaPathKeepsUnknownMacrosIntact(): void
+    /**
+     * `{database}` and `{table}` are substituted here; every other brace token is left
+     * for ClickHouse to expand as a macro on each node.
+     */
+    public function testEngineDefinitionSubstitutesDatabaseAndTableOnly(): void
     {
         $topology = new RegistryTopology(
             table: 'migrations',
@@ -91,12 +105,12 @@ final class RegistryTopologyTest extends AbstractTestCase
         );
 
         self::assertSame(
-            '/clickhouse/{layer}/tables/analytics/migrations',
-            $topology->getReplicaPath(),
+            "ReplicatedReplacingMergeTree('/clickhouse/{layer}/tables/analytics/migrations', '{replica}')",
+            $topology->getEngineDefinition(),
         );
     }
 
-    public function testReplicaNameIsNotExpanded(): void
+    public function testEngineDefinitionKeepsTheReplicaNameUnexpanded(): void
     {
         $topology = new RegistryTopology(
             table: 'migrations',
@@ -105,7 +119,7 @@ final class RegistryTopologyTest extends AbstractTestCase
             replicaName: '{shard}-{replica}',
         );
 
-        self::assertSame('{shard}-{replica}', $topology->getReplicaName());
+        self::assertStringEndsWith("'{shard}-{replica}')", $topology->getEngineDefinition());
     }
 
     /**
@@ -150,9 +164,9 @@ final class RegistryTopologyTest extends AbstractTestCase
             replicaPath: '/clickhouse/tables/{shard}/{database}/{table}',
         );
 
-        self::assertSame(
-            '/clickhouse/tables/{shard}/analytics/migrations',
-            $topology->getReplicaPath(),
+        self::assertStringContainsString(
+            "'/clickhouse/tables/{shard}/analytics/migrations'",
+            $topology->getEngineDefinition(),
         );
     }
 
@@ -258,56 +272,6 @@ final class RegistryTopologyTest extends AbstractTestCase
         ];
     }
 
-    public function testInsertQuorumDefaultsToAuto(): void
-    {
-        $topology = new RegistryTopology(
-            table: 'migrations',
-            database: 'analytics',
-            isReplicated: true,
-        );
-
-        self::assertSame('auto', $topology->getInsertQuorum());
-    }
-
-    public function testInsertQuorumAcceptsIntegers(): void
-    {
-        $topology = new RegistryTopology(
-            table: 'migrations',
-            database: 'analytics',
-            isReplicated: true,
-            insertQuorum: 2,
-        );
-
-        self::assertSame(2, $topology->getInsertQuorum());
-    }
-
-    #[DataProvider('provideInvalidInsertQuorums')]
-    public function testInvalidInsertQuorumIsRejected(
-        int|string $insertQuorum,
-    ): void {
-        $this->expectException(ClickhouseConfigException::class);
-
-        new RegistryTopology(
-            table: 'migrations',
-            database: 'analytics',
-            isReplicated: true,
-            insertQuorum: $insertQuorum,
-        );
-    }
-
-    /**
-     * @return array<string, array{int|string}>
-     */
-    public static function provideInvalidInsertQuorums(): array
-    {
-        return [
-            'negative' => [-1],
-            'unknown keyword' => ['majority'],
-            'empty' => [''],
-            'injection' => ["1 SETTINGS allow_experimental = 1"],
-        ];
-    }
-
     public function testFromConfigWithoutNewKeysReproducesCurrentBehaviour(): void
     {
         $topology = RegistryTopology::fromConfig(
@@ -334,16 +298,16 @@ final class RegistryTopologyTest extends AbstractTestCase
                 'replicated' => true,
                 'replica_path' => '/clickhouse/tables/{database}/{table}',
                 'replica_name' => '{shard}-{replica}',
-                'insert_quorum' => 2,
             ],
             'analytics',
         );
 
         self::assertSame('main', $topology->getCluster());
         self::assertTrue($topology->isReplicated());
-        self::assertSame('/clickhouse/tables/analytics/migrations', $topology->getReplicaPath());
-        self::assertSame('{shard}-{replica}', $topology->getReplicaName());
-        self::assertSame(2, $topology->getInsertQuorum());
+        self::assertSame(
+            "ReplicatedReplacingMergeTree('/clickhouse/tables/analytics/migrations', '{shard}-{replica}')",
+            $topology->getEngineDefinition(),
+        );
     }
 
     /**
@@ -356,13 +320,11 @@ final class RegistryTopologyTest extends AbstractTestCase
             [
                 'table' => 'migrations',
                 'replicated' => '1',
-                'insert_quorum' => '3',
             ],
             'analytics',
         );
 
         self::assertTrue($topology->isReplicated());
-        self::assertSame(3, $topology->getInsertQuorum());
     }
 
     /**

@@ -18,14 +18,13 @@ return new class extends AbstractClickhouseMigration {
     {
         $this->clickhouseClient->write(
             <<<SQL
-                CREATE TABLE IF NOT EXISTS test_integration_events {on_cluster} (
+                CREATE TABLE IF NOT EXISTS test_integration_events {$this->onCluster()} (
                     id UInt32,
                     created_at DateTime DEFAULT now()
                 )
                 ENGINE = MergeTree
                 ORDER BY id
                 SQL,
-            $this->getBindings(),
         );
     }
 };

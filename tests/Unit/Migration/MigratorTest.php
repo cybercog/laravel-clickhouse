@@ -18,7 +18,6 @@ use ClickHouseDB\Statement;
 use Cog\Laravel\Clickhouse\Exception\ClickhouseRegistryEngineMismatchException;
 use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
 use Cog\Laravel\Clickhouse\Migration\Migrator;
-use Cog\Laravel\Clickhouse\Migration\RegistryGrammar;
 use Cog\Laravel\Clickhouse\Migration\RegistryTopology;
 use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
 use Illuminate\Filesystem\Filesystem;
@@ -51,22 +50,22 @@ final class MigratorTest extends AbstractTestCase
      */
     public function testEnsureTableExistsAlwaysIssuesIdempotentCreate(): void
     {
-        $grammar = $this->grammar($this->clusteredTopology());
-
         $this->recordStatements(engine: 'ReplicatedReplacingMergeTree');
 
-        $this->migrator($grammar)->ensureTableExists();
+        $this->migrator($this->clusteredTopology())->ensureTableExists();
 
-        self::assertSame([$grammar->createTable()->sql], $this->writtenSql);
+        self::assertCount(1, $this->writtenSql);
+        self::assertStringStartsWith(
+            'CREATE TABLE IF NOT EXISTS `migrations` ON CLUSTER `main`',
+            $this->writtenSql[0],
+        );
     }
 
     public function testEnsureTableExistsDoesNotProbeWithExistsTable(): void
     {
-        $grammar = $this->grammar($this->clusteredTopology());
-
         $this->recordStatements(engine: 'ReplicatedReplacingMergeTree');
 
-        $this->migrator($grammar)->ensureTableExists();
+        $this->migrator($this->clusteredTopology())->ensureTableExists();
 
         foreach ($this->selectedSql as $sql) {
             self::assertStringNotContainsString('EXISTS TABLE', $sql);
@@ -75,22 +74,18 @@ final class MigratorTest extends AbstractTestCase
 
     public function testEnsureTableExistsVerifiesEngineAgainstTopology(): void
     {
-        $grammar = $this->grammar($this->clusteredTopology());
-
         $this->recordStatements(engine: 'ReplacingMergeTree');
 
         $this->expectException(ClickhouseRegistryEngineMismatchException::class);
 
-        $this->migrator($grammar)->ensureTableExists();
+        $this->migrator($this->clusteredTopology())->ensureTableExists();
     }
 
     public function testEnsureTableExistsIsFluent(): void
     {
-        $grammar = $this->grammar($this->singleNodeTopology());
-
         $this->recordStatements(engine: 'ReplacingMergeTree');
 
-        $migrator = $this->migrator($grammar);
+        $migrator = $this->migrator($this->singleNodeTopology());
 
         self::assertSame($migrator, $migrator->ensureTableExists());
     }
@@ -125,19 +120,13 @@ final class MigratorTest extends AbstractTestCase
     }
 
     private function migrator(
-        RegistryGrammar $grammar,
+        RegistryTopology $topology,
     ): Migrator {
         return new Migrator(
             $this->client,
-            new MigrationRepository($this->client, $grammar),
+            new MigrationRepository($this->client, $topology),
             new Filesystem(),
         );
-    }
-
-    private function grammar(
-        RegistryTopology $topology,
-    ): RegistryGrammar {
-        return new RegistryGrammar($topology);
     }
 
     private function singleNodeTopology(): RegistryTopology
