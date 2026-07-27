@@ -19,6 +19,20 @@ This package includes generation and execution of the ClickHouse database migrat
 - Migration creation
 - Migration execution
 
+## Requirements
+
+| Requirement       | Version         |
+|-------------------|-----------------|
+| PHP               | 8.2+            |
+| Laravel           | 11, 12, 13      |
+| ClickHouse server | 22.8 LTS and up |
+
+Only [ClickHouse LTS releases] are supported. Non-LTS releases are not tested against and may work
+by coincidence, but nothing in this package is designed or verified around them.
+
+The reasoning behind the minimum server version is recorded in
+[ADR 0001](doc/adr/0001-minimum-clickhouse-server-version.md).
+
 ## Installation
 
 Pull in the package through [Composer](https://getcomposer.org/).
@@ -121,6 +135,7 @@ Detailed changes for each release are documented in the [CHANGELOG.md](https://g
 <a href="https://cybercog.su"><img src="https://cloud.githubusercontent.com/assets/1849174/18418932/e9edb390-7860-11e6-8a43-aa3fad524664.png" alt="CyberCog"></a>
 
 [Anton Komarev]: https://komarev.com
+[ClickHouse LTS releases]: https://clickhouse.com/docs/faq/operations/production
 [CyberCog]: https://cybercog.su
 [Follow us on Twitter]: https://twitter.com/cybercog
 [smi2/phpClickHouse]: https://github.com/smi2/phpClickHouse#start

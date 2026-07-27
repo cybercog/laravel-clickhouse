@@ -49,10 +49,11 @@ services:
 
   clickhouse:
     container_name: laravel-clickhouse-clickhouse
-    # Supported server range: 22.8 LTS and up. This pin is a dev convenience, not the
-    # contract — the minimum is enforced by the CI integration job. To test the floor:
+    # Supported server range: 22.8 LTS and up. This pin tracks the current LTS as a dev
+    # convenience, it is not the contract — the minimum is enforced by the CI integration
+    # job. To test the floor:
     # CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:22.8-alpine docker compose up -d
-    image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:25.8-alpine}
+    image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:26.3-alpine}
     environment:
       # Newer images generate a random password for the `default` user otherwise.
       CLICKHOUSE_SKIP_USER_SETUP: 1

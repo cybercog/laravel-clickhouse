@@ -33,39 +33,41 @@ back to hand-rolled escaping, which is exactly the injection surface the design 
 
 This decision requires, and is not complete without:
 
-- the supported range stated in `README.md`;
+- the supported range stated in `README.md`, together with the policy that only LTS releases are
+  supported — a non-LTS release may work, but nothing here is designed or tested around it;
 - a CI integration job pinned to `22.8-alpine`, so the floor is proven by a test rather than
   asserted in prose — the failure mode this ADR exists to prevent;
-- `compose.yml` tracking a current release for development convenience, with a comment saying
-  explicitly that the pin is *not* the contract.
+- `compose.yml` tracking the current LTS for development convenience, with a comment saying
+  explicitly that the pin is *not* the contract. LTS rather than latest stable, because it is what
+  production deployments typically run and it does not churn every few weeks.
 
-The last item ships with this ADR; the first two are still outstanding.
+The first and last ship with this ADR; the CI job is still outstanding.
 
 ## Evidence
 
 The range was bisected rather than assumed. Every cell was measured against a running server —
 21.9.6.24, 22.3.20.29, 22.8.21.38, 23.3.22.3, 23.8.16.16, 24.3.18.7, 24.5.8.10, 24.8.14.39,
-25.8.28.1 — with columns collapsed where consecutive versions agree.
+25.8.28.1, 26.3.17.56 — with columns collapsed where consecutive versions agree.
 
-| Capability | 21.9 | 22.3 | **22.8 LTS** | 23.3 → 24.5 | 24.8 → 25.8 |
-|---|---|---|---|---|---|
-| Typed parameters in reads | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `CREATE TABLE {t:Identifier} (…)` | ✗ | ✓ | ✓ | ✓ | ✓ |
-| `INSERT INTO {t:Identifier} …` | ✗ | ✓ | ✓ | ✓ | ✓ |
-| `EXISTS TABLE {t:Identifier}` | ✗ | ✓ | ✓ | ✓ | ✓ |
-| `INSERT INTO t (…) SETTINGS … VALUES (…)` | ✗ | ✗ | **✓** | ✓ | ✓ |
-| `insert_quorum = 'auto'` | ✗ | ✗ | **✓** | ✓ | ✓ |
-| `ENGINE = ReplicatedReplacingMergeTree('/path', '{replica}')` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `SELECT … FINAL` on `ReplacingMergeTree` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `SETTINGS select_sequential_consistency = 1` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Capability | 21.9 | 22.3 | **22.8 LTS** | 23.3 → 26.3 |
+|---|---|---|---|---|
+| Typed parameters in reads | ✓ | ✓ | ✓ | ✓ |
+| `CREATE TABLE {t:Identifier} (…)` | ✗ | ✓ | ✓ | ✓ |
+| `INSERT INTO {t:Identifier} …` | ✗ | ✓ | ✓ | ✓ |
+| `EXISTS TABLE {t:Identifier}` | ✗ | ✓ | ✓ | ✓ |
+| `INSERT INTO t (…) SETTINGS … VALUES (…)` | ✗ | ✗ | **✓** | ✓ |
+| `insert_quorum = 'auto'` | ✗ | ✗ | **✓** | ✓ |
+| `ENGINE = ReplicatedReplacingMergeTree('/path', '{replica}')` | ✓ | ✓ | ✓ | ✓ |
+| `SELECT … FINAL` on `ReplacingMergeTree` | ✓ | ✓ | ✓ | ✓ |
+| `SETTINGS select_sequential_consistency = 1` | ✓ | ✓ | ✓ | ✓ |
 
 There are exactly two cut points:
 
 - **22.3** adds typed parameters to `CREATE` / `INSERT` / `EXISTS`.
 - **22.8 LTS** adds `INSERT … SETTINGS` and `insert_quorum = 'auto'`.
 
-Above 22.8 and through 25.8, every statement this package emits behaves identically. Nothing
-between 22.8 and 24.8 buys anything.
+From 22.8 through 26.3 — the current LTS — every statement this package emits behaves identically.
+No release after 22.8 buys anything this design uses.
 
 Reproducing a single capability, for any tag:
 
