@@ -124,12 +124,6 @@ final class MigrationRepository
         string $migration,
         int $batch,
     ): Statement {
-        $bindings = [
-            'table' => $this->topology->getTable(),
-            'migration' => $migration,
-            'batch' => $batch,
-        ];
-
         if ($this->topology->isReplicated()) {
             return $this->client->write(
                 <<<'SQL'
@@ -137,7 +131,11 @@ final class MigrationRepository
                     SETTINGS insert_quorum = 'auto'
                     VALUES ({migration:String}, {batch:UInt32})
                     SQL,
-                $bindings,
+                [
+                    'table' => $this->topology->getTable(),
+                    'migration' => $migration,
+                    'batch' => $batch,
+                ],
             );
         }
 
@@ -146,7 +144,11 @@ final class MigrationRepository
                 INSERT INTO {table:Identifier} (migration, batch)
                 VALUES ({migration:String}, {batch:UInt32})
                 SQL,
-            $bindings,
+            [
+                'table' => $this->topology->getTable(),
+                'migration' => $migration,
+                'batch' => $batch,
+            ],
         );
     }
 
