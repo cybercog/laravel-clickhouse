@@ -115,32 +115,38 @@ final class MigrationRepository
      * Writes go through `write()` rather than `insert()`, because `Client::insert()`
      * builds its own `INSERT ... VALUES` and cannot carry a SETTINGS clause.
      *
-     * Spelled out twice rather than assembled, because `SETTINGS` has to sit between
-     * the column list and `VALUES`: a statement with a hole in the middle cannot be
-     * a nowdoc, and the whole point of one is that nothing here is interpolated.
+     * Spelled out twice rather than assembled: `SETTINGS` has to sit between the column
+     * list and `VALUES`, and the quorum cannot be a binding — the server parses a
+     * setting's value as a literal and rejects `{quorum:String}` there with
+     * `SYNTAX_ERROR`, the one place `param_*` does not reach.
      */
     public function add(
         string $migration,
         int $batch,
     ): Statement {
-        $sql = $this->topology->isReplicated()
-            ? <<<'SQL'
-                INSERT INTO {table:Identifier} (migration, batch)
-                SETTINGS insert_quorum = 'auto'
-                VALUES ({migration:String}, {batch:UInt32})
-                SQL
-            : <<<'SQL'
-                INSERT INTO {table:Identifier} (migration, batch)
-                VALUES ({migration:String}, {batch:UInt32})
-                SQL;
+        $bindings = [
+            'table' => $this->topology->getTable(),
+            'migration' => $migration,
+            'batch' => $batch,
+        ];
+
+        if ($this->topology->isReplicated()) {
+            return $this->client->write(
+                <<<'SQL'
+                    INSERT INTO {table:Identifier} (migration, batch)
+                    SETTINGS insert_quorum = 'auto'
+                    VALUES ({migration:String}, {batch:UInt32})
+                    SQL,
+                $bindings,
+            );
+        }
 
         return $this->client->write(
-            $sql,
-            [
-                'table' => $this->topology->getTable(),
-                'migration' => $migration,
-                'batch' => $batch,
-            ],
+            <<<'SQL'
+                INSERT INTO {table:Identifier} (migration, batch)
+                VALUES ({migration:String}, {batch:UInt32})
+                SQL,
+            $bindings,
         );
     }
 
