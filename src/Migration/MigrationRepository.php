@@ -22,15 +22,10 @@ use Cog\Laravel\Clickhouse\Exception\ClickhouseRegistryEngineMismatchException;
  *
  * Everything but the `CREATE TABLE` is fully parameterised: the server resolves
  * both identifiers and values from `param_*`. The DDL is the exception, because
- * `ON CLUSTER` accepts no query parameter — the server wants an identifier or a
- * string literal in the query text itself.
- *
- * Interpolating the clause drags the rest along. The engine definition then sits
- * in the query text too, replica-name macros and all, and the driver rewrites
- * every `{name}` it finds there from the bindings before sending — so one binding
- * named `replica` would eat the `{replica}` the server was meant to expand. The
- * DDL therefore carries no bindings at all, and RegistryTopology validates the
- * three values that reach it as text.
+ * `ON CLUSTER` accepts no query parameter, and interpolating that clause drags
+ * the rest of the statement along with it — so the DDL carries no bindings at
+ * all, and RegistryTopology validates the values that reach it as text instead.
+ * The reasoning is in ADR 0002 D3.
  */
 final class MigrationRepository
 {
@@ -78,28 +73,6 @@ final class MigrationRepository
         );
     }
 
-    /**
-     * Get latest accepted migrations.
-     *
-     * @deprecated since 0.3, to be removed in the next major release. Nothing in this
-     *             package has called it since 0.1: the ordering exists to feed a
-     *             rollback, and migrations here are forward-only by design. Use `all()`,
-     *             which returns the same set.
-     *
-     * @return list<string>
-     */
-    public function latest(): array
-    {
-        return $this->pluckMigrations(
-            <<<'SQL'
-                SELECT migration
-                FROM {table:Identifier}
-                FINAL
-                ORDER BY batch DESC, migration DESC
-                SQL,
-        );
-    }
-
     public function getNextBatchNumber(): int
     {
         return $this->getLastBatchNumber() + 1;
@@ -120,34 +93,23 @@ final class MigrationRepository
      * Writes go through `write()` rather than `insert()`, because `Client::insert()`
      * builds its own `INSERT ... VALUES` and cannot carry a SETTINGS clause.
      *
-     * Spelled out twice rather than assembled: `SETTINGS` has to sit between the column
-     * list and `VALUES`, and the quorum cannot be a binding — the server parses a
-     * setting's value as a literal and rejects `{quorum:String}` there with
-     * `SYNTAX_ERROR`, the one place `param_*` does not reach.
+     * The quorum sits in the statement text: `SETTINGS` has to come between the column
+     * list and `VALUES`, and a setting's value is parsed as a literal, so
+     * `{quorum:String}` there is a `SYNTAX_ERROR` — the one place `param_*` does not
+     * reach. It is a constant, not config, so nothing operator-supplied is interpolated.
      */
     public function add(
         string $migration,
         int $batch,
     ): Statement {
-        if ($this->topology->isReplicated()) {
-            return $this->client->write(
-                <<<'SQL'
-                    INSERT INTO {table:Identifier} (migration, batch)
-                    SETTINGS insert_quorum = 'auto'
-                    VALUES ({migration:String}, {batch:UInt32})
-                    SQL,
-                [
-                    'table' => $this->topology->getTable(),
-                    'migration' => $migration,
-                    'batch' => $batch,
-                ],
-            );
-        }
+        $settings = $this->topology->isReplicated()
+            ? "SETTINGS insert_quorum = 'auto'\n"
+            : '';
 
         return $this->client->write(
-            <<<'SQL'
+            <<<SQL
                 INSERT INTO {table:Identifier} (migration, batch)
-                VALUES ({migration:String}, {batch:UInt32})
+                {$settings}VALUES ({migration:String}, {batch:UInt32})
                 SQL,
             [
                 'table' => $this->topology->getTable(),
@@ -211,43 +173,63 @@ final class MigrationRepository
      */
     public function ensureEngineMatchesTopology(): void
     {
-        $actualEngine = $this->getEngineName();
         $expectedEngine = $this->topology->getEngineName();
 
-        if ($actualEngine === null || $actualEngine === $expectedEngine) {
-            return;
-        }
+        foreach ($this->getEngineNames() as $actualEngine) {
+            if ($actualEngine === $expectedEngine) {
+                continue;
+            }
 
-        throw ClickhouseRegistryEngineMismatchException::make(
-            $this->topology->getTable(),
-            $actualEngine,
-            $expectedEngine,
-        );
+            throw ClickhouseRegistryEngineMismatchException::make(
+                $this->topology->getTable(),
+                $actualEngine,
+                $expectedEngine,
+            );
+        }
     }
 
     /**
-     * The engine of the registry as it exists on the connected node, or `null` when
-     * there is no registry yet.
+     * Every engine the registry is known to use right now — one entry per distinct
+     * engine, empty when no node has a registry yet.
      *
-     * `system.tables` is local to the node and carries no replicated data, so this
-     * query takes neither FINAL nor a consistency setting.
+     * `system.tables` is local to a node, so off a cluster this sees the connected
+     * node alone. On a cluster it has to fan out: a stale non-replicated registry on
+     * a node the migrate run did not happen to reach is exactly the split brain this
+     * check exists to catch, and it is invisible from anywhere else.
+     *
+     * The table carries no replicated data, so the query takes neither FINAL nor a
+     * replica catch-up.
+     *
+     * @return list<string>
      */
-    private function getEngineName(): ?string
+    private function getEngineNames(): array
     {
-        $engine = $this->client->select(
-            <<<'SQL'
-                SELECT engine
-                FROM system.tables
+        $cluster = $this->topology->getCluster();
+
+        $source = $cluster === null
+            ? 'system.tables'
+            : 'clusterAllReplicas({cluster:String}, system.tables)';
+
+        $bindings = [
+            'database' => $this->topology->getDatabase(),
+            'table' => $this->topology->getTable(),
+        ];
+
+        if ($cluster !== null) {
+            $bindings['cluster'] = $cluster;
+        }
+
+        $rows = $this->client->select(
+            <<<SQL
+                SELECT DISTINCT engine
+                FROM {$source}
                 WHERE database = {database:String}
                 AND name = {table:String}
                 SQL,
-            [
-                'database' => $this->topology->getDatabase(),
-                'table' => $this->topology->getTable(),
-            ],
-        )->fetchOne('engine');
+            $bindings,
+        )->rows();
 
-        return $engine === null ? null : (string) $engine;
+        return collect($rows)->pluck('engine')->map(strval(...))->all();
     }
 
     /**
@@ -262,10 +244,9 @@ final class MigrationRepository
     }
 
     /**
-     * Every read of the registry itself catches the connected replica up first and
-     * caps itself at the last quorum-committed part.
+     * Every read of the registry itself catches the connected replica up first.
      *
-     * `exists()` and `getEngineName()` deliberately do neither, because they answer
+     * `exists()` and `getEngineNames()` deliberately do not, because they answer
      * questions about the connected node alone and have to work before the registry
      * exists.
      *
@@ -277,10 +258,6 @@ final class MigrationRepository
     ): Statement {
         $this->syncReplica();
 
-        if ($this->topology->isReplicated()) {
-            $sql .= "\nSETTINGS select_sequential_consistency = 1";
-        }
-
         return $this->client->select(
             $sql,
             $bindings ?? ['table' => $this->topology->getTable()],
@@ -288,15 +265,16 @@ final class MigrationRepository
     }
 
     /**
-     * `select_sequential_consistency` caps a read at the last quorum-committed part,
-     * it does not wait for the connected replica to reach it — a replica that has not
-     * fetched that part yet simply returns fewer rows, with no error. Only
-     * `SYSTEM SYNC REPLICA` closes the gap, by draining the replication queue.
+     * Draining the replication queue is what makes a read on one node see a write
+     * acknowledged on another. `select_sequential_consistency` looks like it would do
+     * the same and does not: ClickHouse documents it as inoperative while
+     * `insert_quorum_parallel` is enabled, which it is by default — see ADR 0002 D2.
      *
-     * Every read pays for it, rather than the first one per instance. A migrate run
-     * reads the registry twice, and the second call returns straight away against a
-     * queue the first one already drained — cheaper than owning a flag whose
-     * correctness depends on how long the repository happens to live.
+     * Every read pays for it, rather than the first one per instance: a flag would
+     * make correctness depend on how long the repository happens to live, and under
+     * Octane or a queue worker a second migrate run would reuse one that believes it
+     * has already synced. A run reads the registry twice, and the second call returns
+     * straight away against a queue the first one drained.
      */
     private function syncReplica(): void
     {

@@ -88,7 +88,7 @@ final class ClusterRegistryTest extends AbstractClusterTestCase
 
     /**
      * D5: a write acknowledged on one node is visible from another one immediately —
-     * `insert_quorum` on the write, `select_sequential_consistency` on the read.
+     * `insert_quorum` on the write, `SYSTEM SYNC REPLICA` before the read.
      */
     public function testAMigrationRecordedOnOneNodeIsVisibleFromAnother(): void
     {
@@ -191,6 +191,33 @@ final class ClusterRegistryTest extends AbstractClusterTestCase
         );
 
         $repository = $this->repositoryOn($this->firstNode(), $table);
+
+        $this->expectException(ClickhouseRegistryEngineMismatchException::class);
+
+        $repository->ensureEngineMatchesTopology();
+    }
+
+    /**
+     * And it is reported from any node, not only the one that owns the stray table —
+     * the migrate run has no say in which node it lands on.
+     */
+    public function testAPreExistingLocalRegistryIsReportedFromAnotherNode(): void
+    {
+        $table = $this->registerClusterTable();
+
+        $this->firstNode()->write(
+            <<<SQL
+                CREATE TABLE `{$table}` (
+                    migration String,
+                    batch UInt32,
+                    applied_at DateTime DEFAULT now()
+                )
+                ENGINE = ReplacingMergeTree
+                ORDER BY migration
+                SQL,
+        );
+
+        $repository = $this->repositoryOn($this->lastNode(), $table);
 
         $this->expectException(ClickhouseRegistryEngineMismatchException::class);
 

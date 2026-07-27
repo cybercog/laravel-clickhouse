@@ -144,8 +144,8 @@ final class MigrationRepositoryTest extends AbstractTestCase
     }
 
     /**
-     * The whole statement, not just the setting: `SETTINGS` has to sit between the
-     * column list and `VALUES`, and the two variants are spelled out separately.
+     * `SETTINGS` has to sit between the column list and `VALUES`, which is the whole
+     * reason the quorum rides in the statement text rather than in a binding.
      */
     public function testAddTakesAQuorumOnAReplicatedRegistry(): void
     {
@@ -170,37 +170,40 @@ final class MigrationRepositoryTest extends AbstractTestCase
         $repository = $this->repository();
 
         $repository->all();
-        $repository->latest();
         $repository->total();
         $repository->getLastBatchNumber();
         $repository->find(self::MIGRATION_NAME);
 
-        self::assertCount(5, $this->selects);
+        self::assertCount(4, $this->selects);
 
         foreach ($this->selects as $select) {
             self::assertStringContainsString('FINAL', $select['sql']);
-            self::assertStringNotContainsString('select_sequential_consistency', $select['sql']);
         }
     }
 
-    public function testRegistryReadsAreSequentiallyConsistentWhenReplicated(): void
+    /**
+     * ClickHouse documents `select_sequential_consistency` as inoperative while
+     * `insert_quorum_parallel` is enabled, which it is by default. Asking for it would
+     * read as a guarantee the server does not give — the replica catch-up below is
+     * what actually makes a cross-node read correct.
+     */
+    public function testRegistryReadsDoNotAskForSequentialConsistency(): void
     {
         $repository = $this->repository($this->replicatedTopology());
 
         $repository->all();
         $repository->total();
 
+        self::assertNotSame([], $this->selects);
+
         foreach ($this->selects as $select) {
-            self::assertStringContainsString('SETTINGS select_sequential_consistency = 1', $select['sql']);
+            self::assertStringNotContainsString('select_sequential_consistency', $select['sql']);
         }
     }
 
     /**
-     * `select_sequential_consistency` caps a read at the quorum-committed point but
-     * never waits for the connected replica to get there, so every read of the registry
-     * drains the replication queue first. Per read, not once per instance: a repository
-     * that outlives one migrate run would otherwise carry a stale belief that it has
-     * already caught up.
+     * Per read, not once per instance: a repository that outlives one migrate run
+     * would otherwise carry a stale belief that it has already caught up.
      */
     public function testEveryReadCatchesTheReplicaUp(): void
     {
@@ -241,10 +244,6 @@ final class MigrationRepositoryTest extends AbstractTestCase
         $repository->ensureEngineMatchesTopology();
 
         self::assertSame([], $this->writes);
-
-        foreach ($this->selects as $select) {
-            self::assertStringNotContainsString('select_sequential_consistency', $select['sql']);
-        }
     }
 
     public function testAllPlucksMigrations(): void
@@ -258,17 +257,6 @@ final class MigrationRepositoryTest extends AbstractTestCase
 
         self::assertSame(['a', 'b'], $this->repository()->all());
         self::assertSame(['table' => 'migrations'], $this->selects[0]['bindings']);
-    }
-
-    /**
-     * Deprecated, and covered until it is actually removed.
-     */
-    public function testLatestOrdersByBatchThenName(): void
-    {
-        $this->selectResult = $this->statementWithRows([['migration' => 'b'], ['migration' => 'a']]);
-
-        self::assertSame(['b', 'a'], $this->repository()->latest());
-        self::assertStringContainsString('ORDER BY batch DESC, migration DESC', $this->selects[0]['sql']);
     }
 
     public function testTotal(): void
@@ -333,7 +321,7 @@ final class MigrationRepositoryTest extends AbstractTestCase
 
     public function testEnsureEngineMatchesTopologyPassesForMatchingEngine(): void
     {
-        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplacingMergeTree');
+        $this->selectResult = $this->statementWithRows([['engine' => 'ReplacingMergeTree']]);
 
         $this->repository()->ensureEngineMatchesTopology();
 
@@ -350,11 +338,36 @@ final class MigrationRepositoryTest extends AbstractTestCase
 
     public function testEnsureEngineMatchesTopologyPassesForAbsentRegistry(): void
     {
-        $this->selectResult = $this->statementWithFetchOne('engine', null);
+        $this->selectResult = $this->statementWithRows([]);
 
         $this->repository($this->replicatedTopology())->ensureEngineMatchesTopology();
 
         self::assertCount(1, $this->selects);
+    }
+
+    /**
+     * `system.tables` is local to a node, so on a cluster the probe has to ask every
+     * node: the registry it must reject may well be sitting on one this run never
+     * connected to.
+     */
+    public function testEngineProbeFansOutAcrossTheCluster(): void
+    {
+        $this->selectResult = $this->statementWithRows([['engine' => 'ReplicatedReplacingMergeTree']]);
+
+        $this->repository($this->clusteredTopology())->ensureEngineMatchesTopology();
+
+        self::assertStringContainsString(
+            'FROM clusterAllReplicas({cluster:String}, system.tables)',
+            $this->selects[0]['sql'],
+        );
+        self::assertSame(
+            [
+                'database' => 'analytics',
+                'table' => 'migrations',
+                'cluster' => 'main',
+            ],
+            $this->selects[0]['bindings'],
+        );
     }
 
     /**
@@ -364,7 +377,7 @@ final class MigrationRepositoryTest extends AbstractTestCase
      */
     public function testEnsureEngineMatchesTopologyRejectsNonReplicatedRegistry(): void
     {
-        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplacingMergeTree');
+        $this->selectResult = $this->statementWithRows([['engine' => 'ReplacingMergeTree']]);
 
         $this->expectException(ClickhouseRegistryEngineMismatchException::class);
         $this->expectExceptionMessageMatches('/ReplacingMergeTree/');
@@ -373,9 +386,26 @@ final class MigrationRepositoryTest extends AbstractTestCase
         $this->repository($this->replicatedTopology())->ensureEngineMatchesTopology();
     }
 
+    /**
+     * Half-converted: the fan-out finds both engines, and the odd one out is enough.
+     */
+    public function testEnsureEngineMatchesTopologyRejectsAMixedCluster(): void
+    {
+        $this->selectResult = $this->statementWithRows(
+            [
+                ['engine' => 'ReplicatedReplacingMergeTree'],
+                ['engine' => 'ReplacingMergeTree'],
+            ],
+        );
+
+        $this->expectException(ClickhouseRegistryEngineMismatchException::class);
+
+        $this->repository($this->clusteredTopology())->ensureEngineMatchesTopology();
+    }
+
     public function testEnsureEngineMatchesTopologyRejectsReplicatedRegistryOnSingleNodeTopology(): void
     {
-        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplicatedReplacingMergeTree');
+        $this->selectResult = $this->statementWithRows([['engine' => 'ReplicatedReplacingMergeTree']]);
 
         $this->expectException(ClickhouseRegistryEngineMismatchException::class);
 
