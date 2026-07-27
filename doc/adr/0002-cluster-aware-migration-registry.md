@@ -52,27 +52,38 @@ still gets what the setting exists for by spelling the value out — `/clickhous
 For the same reason `cluster` without `replicated` is rejected at wiring time: `ON CLUSTER` over
 non-replicated tables creates N independent registries and swallows the inconsistency.
 
-### D2 — Consistent reads take three mechanisms, not two
+### D2 — Consistent reads take `FINAL`, a quorum write and a replica catch-up
 
-Every registry read uses `FINAL`. In replicated mode the `INSERT` also carries
-`SETTINGS insert_quorum = 'auto'` and reads append `SETTINGS select_sequential_consistency = 1`.
+Every registry read uses `FINAL`. In replicated mode the `INSERT` carries
+`SETTINGS insert_quorum = 'auto'`, and every read of the registry is preceded by
+`SYSTEM SYNC REPLICA`.
 
-That is necessary and **not sufficient**. `select_sequential_consistency` caps a read at the last
-quorum-committed part; it does not wait for the connected replica to reach it. A replica that has
-not fetched the part yet returns *fewer* rows, with no error — precisely the "second run re-applies
-migrations" failure the setting looks like it prevents. So every registry read is preceded by
-`SYSTEM SYNC REPLICA`. `exists()` and `getEngineName()` are exempt: both answer questions about the
-connected node alone and must work before the registry exists.
+`select_sequential_consistency = 1` is the setting that looks like it belongs here, and it is not
+used. Two reasons, either one sufficient. ClickHouse documents it as inoperative while
+`insert_quorum_parallel` is enabled — which it is, by default, on every node of the test cluster.
+And even where it does apply it caps a read at the last quorum-committed part without waiting for
+the connected replica to reach it: a replica that has not fetched the part yet returns *fewer* rows,
+with no error, which is precisely the "second run re-applies migrations" failure the setting appears
+to prevent. Draining the replication queue is what actually makes the read see the write. An earlier
+revision of this ADR carried the setting alongside the sync; it was doing nothing, and it is gone.
 
-Doing it per read rather than once per repository is deliberate. A flag makes correctness depend on
+`exists()` and the engine probe are exempt from the sync: both answer questions about table
+existence rather than table contents, and have to work before the registry exists.
+
+Syncing per read rather than once per repository is deliberate. A flag makes correctness depend on
 how long the object lives — under Octane or a queue worker a second migrate run would reuse a
-repository that believes it has already synced — and buys one saved round trip on a run that reads
-the registry twice, where the second call returns immediately against a queue the first one drained.
-`Migrator` is therefore an ordinary `singleton`, with no state to make that binding a lie.
+repository that believes it has already synced — and it buys one saved round trip on a run that
+reads the registry twice, where the second call returns immediately against a queue the first one
+drained. `Migrator` is therefore an ordinary `singleton`, with no state to make that binding a lie.
 
-The quorum is not configurable. The only value an operator would reach for is `0`, and `0` turns
-`select_sequential_consistency` into a silent no-op — a setting that looks like a guarantee and
-provides none.
+Twice is the whole cost, regardless of how many files the directory holds: `Migrator` lists the
+applied migrations once and filters the directory against that list in memory, then takes the batch
+number. Checking each file against the registry individually would multiply both the sync and the
+read by the number of pending migrations.
+
+The quorum is not configurable. The only value an operator would reach for is `0`, which turns a
+quorum write into an ordinary one and leaves the sync draining a queue that may not carry the row
+yet.
 
 ### D3 — Three values are interpolated; everything else is a query parameter
 
@@ -113,6 +124,12 @@ that owns it, while `CREATE TABLE IF NOT EXISTS … ON CLUSTER` cheerfully creat
 tables everywhere else — the migration history survives on one node and is invisible from the rest.
 `ensureEngineMatchesTopology()` compares `system.tables.engine` against the configured topology and
 throws `ClickhouseRegistryEngineMismatchException` naming both engines and the conversion recipe.
+
+`system.tables` is local to a node, so in cluster mode the probe reads
+`clusterAllReplicas(cluster, system.tables)` instead. A node-local probe would only catch the stray
+registry when the migrate run happened to land on the node that owns it — which is the same coin
+flip the whole ADR exists to remove, and it would clear the check on the next run from anywhere
+else.
 
 ### D6 — Migration authors get one method, interpolated
 
@@ -172,7 +189,8 @@ current release alone:
   immediately by a sequential-consistency read on `s2r2` returns nothing, then returns the row a
   moment later. 26.3 usually wins the race, which hides the defect rather than fixing it (D2). This
   is why the cluster suite has to run on the declared floor and not only on the version a developer
-  happens to have running.
+  happens to have running. The setting is not in the shipped code at all — it is documented as
+  inoperative under the default `insert_quorum_parallel = 1`, so it never had a chance to help.
 
 ## Consequences
 
@@ -194,7 +212,10 @@ current release alone:
   behaviour, but they are five more things an operator can get wrong.
 - Cluster mode couples a migrate run to the health of a majority of replicas. That is the intended
   trade-off — it is also a new way for a deploy to block.
-- Every registry read pays a `SYSTEM SYNC REPLICA` in replicated mode.
+- Every registry read pays a `SYSTEM SYNC REPLICA` in replicated mode — twice per migrate run.
+- The engine probe queries every replica in cluster mode, so a node that is down fails the check
+  rather than being skipped. For a statement about cluster-wide consistency that is the right way
+  round, but it does mean a degraded cluster cannot be migrated without attention.
 - Cluster coverage requires a six-container environment, which is slower than the rest of CI.
 
 **Neutral**
@@ -223,7 +244,13 @@ of several configured clusters the registry belongs to, and guessing wrong is ex
 split-brain in D5. Explicit configuration makes the operator's intent inspectable.
 
 **`select_sequential_consistency` alone, without `SYSTEM SYNC REPLICA`.** Rejected by measurement —
-see Evidence. It was the original design, and it is wrong.
+see Evidence. It was the original design, and it is wrong. Carrying it *alongside* the sync was
+rejected too: a setting that ClickHouse documents as inoperative under the running configuration
+reads as a guarantee to whoever maintains this next.
+
+**A node-local engine probe.** Rejected. It only sees the stray registry from the node that owns it,
+so whether a topology mismatch is reported depends on which node the connection lands on — the exact
+failure mode D1 exists to remove (D5).
 
 ## Revisit when
 

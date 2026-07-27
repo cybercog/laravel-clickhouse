@@ -60,19 +60,16 @@ return [
 
         /*
         | Topology of the migration registry itself. The defaults reproduce single-node
-        | behaviour exactly. `replicated` is required whenever `cluster` is set: an
-        | `ON CLUSTER` registry on a non-replicated engine is one independent table per
-        | shard, and they diverge from the first migration onwards.
+        | behaviour exactly. Three rules the package cannot infer for you:
         |
-        | The replica path is `replica_path_prefix` followed by the database and the
-        | table. The prefix must hold no macro: the registry is replicated and never
-        | sharded, so every host has to resolve the same path. Change it only to keep
-        | several installations apart in a shared Keeper — and spell the value out,
-        | '/clickhouse/staging/tables' rather than a macro.
+        |   - `replicated` is required whenever `cluster` is set;
+        |   - `replica_path_prefix` — followed by the database and the table — must hold
+        |     no macro, so that every host resolves the same path;
+        |   - `replica_name` is expanded per node and must be unique cluster-wide; use
+        |     '{shard}-{replica}' when {replica} repeats across shards.
         |
-        | `replica_name`, in contrast, is expanded by ClickHouse on each node and must
-        | be unique cluster-wide — set it to something like '{shard}-{replica}' when
-        | {replica} repeats across shards.
+        | Why, and how to convert an existing registry: see the upgrade guide and
+        | doc/adr/0002-cluster-aware-migration-registry.md.
         */
         'cluster' => env('CLICKHOUSE_MIGRATION_CLUSTER'),
         'replicated' => (bool) env('CLICKHOUSE_MIGRATION_REPLICATED', false),

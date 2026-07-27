@@ -6,9 +6,12 @@
 #   docker compose -f compose.yml -f compose.cluster.yml up -d
 #   docker compose -f compose.yml -f compose.cluster.yml exec php85 vendor/bin/phpunit --testsuite Cluster
 #
-# Pin the server version with CLICKHOUSE_IMAGE (22.8 LTS is the supported minimum):
+# Pin the server version with CLICKHOUSE_IMAGE (22.8 LTS is the supported minimum).
+# Switching versions needs --renew-anon-volumes: Keeper's raft log lives in an anonymous
+# volume that a plain recreate carries over, and 22.8 cannot read a snapshot written by a
+# newer version (`Unsupported snapshot version`, then exit 70).
 #
-#   CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:22.8-alpine docker compose -f compose.yml -f compose.cluster.yml up -d
+#   CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:22.8-alpine docker compose -f compose.yml -f compose.cluster.yml up -d --renew-anon-volumes
 #
 # Node HTTP ports on the host: s1r1 8131, s1r2 8132, s2r1 8133, s2r2 8134. To drive the
 # suite from the host instead of a php container, name the published ports — this is what

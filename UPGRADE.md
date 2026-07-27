@@ -82,6 +82,10 @@ so a standard upgrade passes this check. It only fires if you created the regist
 different engine, or if you enable `replicated` on an installation that already has a plain one —
 see *Enabling cluster mode* below.
 
+In cluster mode the check reads every node, through `clusterAllReplicas`, rather than the one the
+connection landed on. A node that is unreachable therefore fails the check instead of being skipped
+silently.
+
 ### API changes
 
 `MigrationRepository::__construct()` takes a `RegistryTopology` instead of the registry table name:
@@ -103,12 +107,31 @@ new MigrationRepository(
 Neither class is bound in the container — the `Migrator` builds both — so this only affects code
 that constructed the repository directly.
 
-`MigrationRepository::latest()` is deprecated and will be removed in the next major release. It
-returns the applied migrations ordered by batch and name descending — the shape Laravel's own
-repository uses to feed a rollback, which this package does not have by design — and nothing in the
-package has ever called it. Switch to `all()`, which returns the same set.
+`MigrationRepository::latest()` was removed. It returned the applied migrations ordered by batch and
+name descending — the shape Laravel's own repository uses to feed a rollback, which this package
+does not have by design — and nothing in the package ever called it. Use `all()`, which returns the
+same set.
 
-`AbstractClickhouseMigration` gained one method, `onCluster()`. Nothing was removed.
+`Migrator::__construct()` no longer takes a `ClickHouseDB\Client`. It never used it: a migration
+file returns an anonymous class it constructs itself, so the migrator has no opportunity to inject
+one, and the migration resolves the client it needs on its own.
+
+```php
+// 0.2
+new Migrator($client, $repository, $filesystem);
+
+// 0.3
+new Migrator($repository, $filesystem);
+```
+
+A migration file that does not `return` its migration instance now fails with
+`Migration … must return a migration instance` before anything runs. 0.2 had a fallback that
+guessed a class name from the file name and instantiated it — but the recorded name is read off the
+instance, and that path always ended in `Only anonymous migrations are supported` *after* `up()` had
+already executed. Files created by `make:clickhouse-migration` return their instance and are
+unaffected.
+
+`AbstractClickhouseMigration` gained one method, `onCluster()`. Nothing was removed from it.
 
 ### Optional: enabling cluster mode
 
