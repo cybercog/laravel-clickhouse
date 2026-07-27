@@ -126,17 +126,20 @@ final class MigrationRegistryTest extends AbstractIntegrationTestCase
         self::assertSame(1, $repository->total());
     }
 
-    public function testGetEngineReportsTheRegistryEngine(): void
+    /**
+     * The engine probe reads a real `system.tables`: it must accept an absent
+     * registry, and one this package has just created.
+     */
+    public function testEngineCheckAcceptsAnAbsentAndAFreshRegistry(): void
     {
         $repository = $this->singleNodeRepository();
+
+        $repository->ensureEngineMatchesTopology();
+
         $repository->createMigrationRegistryTable();
+        $repository->ensureEngineMatchesTopology();
 
-        self::assertSame('ReplacingMergeTree', $repository->getEngine());
-    }
-
-    public function testGetEngineReturnsNullWhenTheRegistryIsAbsent(): void
-    {
-        self::assertNull($this->singleNodeRepository()->getEngine());
+        self::assertTrue($repository->exists());
     }
 
     /**

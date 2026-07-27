@@ -115,6 +115,45 @@ php artisan clickhouse:migrate --step=1
 
 > Rolling back migrations is intentionally unavailable. Migrations should go only forward.
 
+#### Running on a cluster
+
+By default the migration registry is a local `ReplacingMergeTree` — correct for a single node, and
+wrong behind a load balancer, where each node would keep its own view of which migrations have been
+applied.
+
+Cluster mode requires ClickHouse Keeper (or ZooKeeper) and a `remote_servers` entry naming the
+cluster. Enable it with:
+
+```dotenv
+CLICKHOUSE_MIGRATION_CLUSTER=main
+CLICKHOUSE_MIGRATION_REPLICATED=true
+```
+
+The registry then becomes a `ReplicatedReplacingMergeTree` created `ON CLUSTER`, and
+`clickhouse:migrate` is safe to run from any node.
+
+Two rules the configuration cannot infer for you:
+
+- **`CLICKHOUSE_MIGRATION_REPLICA_NAME` must be unique cluster-wide.** It defaults to the
+  `{replica}` macro. If `{replica}` repeats across shards in your `macros.xml`, set it to
+  `{shard}-{replica}` — two nodes claiming one replica fail with `REPLICA_ALREADY_EXISTS`.
+- **`CLICKHOUSE_MIGRATION_REPLICA_PATH` must not contain `{shard}`.** The registry is replicated,
+  never sharded: a `{shard}` in the path gives each shard its own history. This one is rejected for
+  you.
+
+Migrations themselves opt into `ON CLUSTER` with `onCluster()`, which returns the whole clause and
+collapses to nothing where no cluster is configured, so one file serves both deployments:
+
+```php
+$this->clickhouseClient->write(
+    "CREATE TABLE events {$this->onCluster()} (id UInt32) ENGINE = MergeTree ORDER BY id",
+);
+```
+
+Converting a registry created before cluster mode was enabled is a manual step — the recipe is in
+[UPGRADE.md](UPGRADE.md). The design is recorded in
+[ADR 0002](doc/adr/0002-cluster-aware-migration-registry.md).
+
 ## Changelog
 
 Detailed changes for each release are documented in the [CHANGELOG.md](https://github.com/cybercog/laravel-clickhouse/blob/master/CHANGELOG.md).

@@ -112,20 +112,10 @@ application tuned to a 1-second cap cannot run an `ON CLUSTER` statement at all 
 so the migrator builds its own client from `migrations.timeout` (default 180) and leaves the
 application-facing client exactly as configured.
 
-### Outstanding
-
-One follow-up does not ship with this ADR: README coverage of the Keeper and macro prerequisites,
-the unique-replica-name rule and the manual registry-conversion recipe from D5.
-
 ## Evidence
 
-Three suites, run against both ends of the supported range:
-
-| Suite | ClickHouse 22.8.21.38 | ClickHouse 26.3.17.56 |
-|---|---|---|
-| `Unit` (no server) | 91 tests, 160 assertions | 91 tests, 160 assertions |
-| `Integration` (single node) | 14 tests, 29 assertions | 14 tests, 29 assertions |
-| `Cluster` (2 shards × 2 replicas + Keeper) | 9 tests, 41 assertions | 9 tests, 41 assertions |
+Three suites — `Unit` (no server), `Integration` (single node) and `Cluster` (2 shards × 2 replicas
+plus Keeper) — run against both ends of the supported range, 22.8 and 26.3.
 
 `compose.cluster.yml` provides the cluster environment; the built-in `test_shard_localhost` cluster
 is absent on current versions, so `ON CLUSTER` cannot be tested without a real Keeper.

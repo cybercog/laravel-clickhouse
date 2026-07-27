@@ -62,7 +62,7 @@ final class AbstractClickhouseMigrationTest extends AbstractTestCase
 
         $this->expectException(ClickhouseConfigException::class);
 
-        $this->migration();
+        $this->migration()->onCluster();
     }
 
     /**

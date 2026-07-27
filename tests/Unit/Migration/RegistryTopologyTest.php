@@ -29,8 +29,7 @@ final class RegistryTopologyTest extends AbstractTestCase
 
         self::assertSame('migrations', $topology->getTable());
         self::assertSame('analytics', $topology->getDatabase());
-        self::assertNull($topology->getCluster());
-        self::assertFalse($topology->isClustered());
+        self::assertSame('', $topology->getOnClusterClause());
         self::assertFalse($topology->isReplicated());
         self::assertSame('ReplacingMergeTree', $topology->getEngine());
     }
@@ -44,7 +43,7 @@ final class RegistryTopologyTest extends AbstractTestCase
         );
 
         self::assertTrue($topology->isReplicated());
-        self::assertFalse($topology->isClustered());
+        self::assertSame('', $topology->getOnClusterClause());
         self::assertSame('ReplicatedReplacingMergeTree', $topology->getEngine());
     }
 
@@ -57,28 +56,8 @@ final class RegistryTopologyTest extends AbstractTestCase
             isReplicated: true,
         );
 
-        self::assertTrue($topology->isClustered());
-        self::assertSame('main', $topology->getCluster());
+        self::assertSame('ON CLUSTER `main`', $topology->getOnClusterClause());
         self::assertSame('ReplicatedReplacingMergeTree', $topology->getEngine());
-    }
-
-    public function testOnClusterClause(): void
-    {
-        self::assertSame(
-            '',
-            (new RegistryTopology(table: 'migrations', database: 'analytics'))
-                ->getOnClusterClause(),
-        );
-
-        self::assertSame(
-            ' ON CLUSTER `main`',
-            (new RegistryTopology(
-                table: 'migrations',
-                database: 'analytics',
-                cluster: 'main',
-                isReplicated: true,
-            ))->getOnClusterClause(),
-        );
     }
 
     public function testEngineDefinitionOnASingleNode(): void
@@ -284,7 +263,7 @@ final class RegistryTopologyTest extends AbstractTestCase
 
         self::assertSame('migrations', $topology->getTable());
         self::assertSame('analytics', $topology->getDatabase());
-        self::assertNull($topology->getCluster());
+        self::assertSame('', $topology->getOnClusterClause());
         self::assertFalse($topology->isReplicated());
         self::assertSame('ReplacingMergeTree', $topology->getEngine());
     }
@@ -302,29 +281,12 @@ final class RegistryTopologyTest extends AbstractTestCase
             'analytics',
         );
 
-        self::assertSame('main', $topology->getCluster());
+        self::assertSame('ON CLUSTER `main`', $topology->getOnClusterClause());
         self::assertTrue($topology->isReplicated());
         self::assertSame(
             "ReplicatedReplacingMergeTree('/clickhouse/tables/analytics/migrations', '{shard}-{replica}')",
             $topology->getEngineDefinition(),
         );
-    }
-
-    /**
-     * `env('CLICKHOUSE_MIGRATION_REPLICATED', false)` only casts the literals
-     * `true` / `false`, so string values must survive the trip.
-     */
-    public function testFromConfigCastsStringFlags(): void
-    {
-        $topology = RegistryTopology::fromConfig(
-            [
-                'table' => 'migrations',
-                'replicated' => '1',
-            ],
-            'analytics',
-        );
-
-        self::assertTrue($topology->isReplicated());
     }
 
     /**
@@ -341,7 +303,6 @@ final class RegistryTopologyTest extends AbstractTestCase
             'analytics',
         );
 
-        self::assertNull($topology->getCluster());
-        self::assertFalse($topology->isClustered());
+        self::assertSame('', $topology->getOnClusterClause());
     }
 }

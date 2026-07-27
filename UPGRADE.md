@@ -8,10 +8,14 @@ fully backwards compatible. Read the two required actions below before upgrading
 
 ### Required: ClickHouse 22.8 LTS or newer
 
-The registry now uses typed query parameters (`{table:Identifier}`) in `CREATE TABLE`, `INSERT` and
-`EXISTS TABLE`, which the server rejects with `SYNTAX_ERROR` before 22.3, and `INSERT … SETTINGS`,
-which arrived in 22.8. Earlier releases substituted identifiers client-side and worked on 21.9,
-the version `compose.yml` used to pin.
+The registry now uses typed query parameters (`{table:Identifier}`) in its reads, its `INSERT` and
+its `EXISTS TABLE` probe, which the server rejects with `SYNTAX_ERROR` before 22.3, and
+`INSERT … SETTINGS`, which arrived in 22.8. Earlier releases substituted identifiers client-side and
+worked on 21.9, the version `compose.yml` used to pin.
+
+The `CREATE TABLE` is the exception: `ON CLUSTER` accepts no query parameter, and neither the
+ZooKeeper path nor the replica name may be one, because ClickHouse does not expand macros passed as
+parameters. Those values are validated as identifiers and quoted instead.
 
 Only LTS releases are supported. The reasoning, and the measured capability matrix behind the
 number, are in [ADR 0001](doc/adr/0001-minimum-clickhouse-server-version.md).
@@ -90,8 +94,7 @@ new MigrationRepository(
 Neither class is bound in the container — the `Migrator` builds both — so this only affects code
 that constructed the repository directly.
 
-`AbstractClickhouseMigration` gained an optional third constructor argument (`$clusterName`) and one
-method, `onCluster()`. Nothing was removed.
+`AbstractClickhouseMigration` gained one method, `onCluster()`. Nothing was removed.
 
 ### Optional: enabling cluster mode
 

@@ -215,12 +215,12 @@ final class MigrationRepositoryTest extends AbstractTestCase
      * Both answer questions about the connected node alone, and both have to work
      * before the registry exists — when there is no replica to catch up with.
      */
-    public function testExistsAndGetEngineDoNotCatchTheReplicaUp(): void
+    public function testExistsAndTheEngineProbeDoNotCatchTheReplicaUp(): void
     {
         $repository = $this->repository($this->replicatedTopology());
 
         $repository->exists();
-        $repository->getEngine();
+        $repository->ensureEngineMatchesTopology();
 
         self::assertSame([], $this->writes);
 
@@ -305,11 +305,13 @@ final class MigrationRepositoryTest extends AbstractTestCase
         );
     }
 
-    public function testGetEngineReadsTheLocalSystemTable(): void
+    public function testEnsureEngineMatchesTopologyPassesForMatchingEngine(): void
     {
         $this->selectResult = $this->statementWithFetchOne('engine', 'ReplacingMergeTree');
 
-        self::assertSame('ReplacingMergeTree', $this->repository()->getEngine());
+        $this->repository()->ensureEngineMatchesTopology();
+
+        self::assertCount(1, $this->selects);
         self::assertStringContainsString('FROM system.tables', $this->selects[0]['sql']);
         self::assertSame(
             [
@@ -318,22 +320,6 @@ final class MigrationRepositoryTest extends AbstractTestCase
             ],
             $this->selects[0]['bindings'],
         );
-    }
-
-    public function testGetEngineReturnsNullWhenRegistryIsAbsent(): void
-    {
-        $this->selectResult = $this->statementWithFetchOne('engine', null);
-
-        self::assertNull($this->repository()->getEngine());
-    }
-
-    public function testEnsureEngineMatchesTopologyPassesForMatchingEngine(): void
-    {
-        $this->selectResult = $this->statementWithFetchOne('engine', 'ReplacingMergeTree');
-
-        $this->repository()->ensureEngineMatchesTopology();
-
-        self::assertCount(1, $this->selects);
     }
 
     public function testEnsureEngineMatchesTopologyPassesForAbsentRegistry(): void

@@ -210,17 +210,19 @@ final class ClusterRegistryTest extends AbstractClusterTestCase
         $repository->createMigrationRegistryTable();
     }
 
-    public function testGetEngineReportsTheReplicatedEngine(): void
+    public function testTheRegistryIsCreatedWithTheReplicatedEngineOnEveryNode(): void
     {
         $table = $this->registerClusterTable();
 
         $this->repositoryOn($this->firstNode(), $table)->createMigrationRegistryTable();
 
         foreach ($this->nodes() as $node) {
-            self::assertSame(
-                'ReplicatedReplacingMergeTree',
-                $this->repositoryOn($this->client($node), $table)->getEngine(),
-            );
+            $repository = $this->repositoryOn($this->client($node), $table);
+
+            self::assertTrue($repository->exists(), "{$node} has no registry.");
+
+            // Throws unless this node's engine is ReplicatedReplacingMergeTree.
+            $repository->ensureEngineMatchesTopology();
         }
     }
 

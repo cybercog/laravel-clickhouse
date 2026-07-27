@@ -41,13 +41,16 @@ final class MigrationRepository
      */
     public function createMigrationRegistryTable(): Statement
     {
-        $table = Identifier::quote($this->topology->getTable());
         $onCluster = $this->topology->getOnClusterClause();
+
+        $target = Identifier::quote($this->topology->getTable())
+            . ($onCluster === '' ? '' : ' ' . $onCluster);
+
         $engine = $this->topology->getEngineDefinition();
 
         return $this->client->write(
             <<<SQL
-                CREATE TABLE IF NOT EXISTS {$table}{$onCluster} (
+                CREATE TABLE IF NOT EXISTS {$target} (
                     migration String,
                     batch UInt32,
                     applied_at DateTime DEFAULT now()
@@ -174,31 +177,6 @@ final class MigrationRepository
     }
 
     /**
-     * The engine of the registry as it exists on the connected node, or `null` when
-     * there is no registry yet.
-     *
-     * `system.tables` is local to the node and carries no replicated data, so this
-     * query takes neither FINAL nor a consistency setting.
-     */
-    public function getEngine(): ?string
-    {
-        $engine = $this->client->select(
-            <<<'SQL'
-                SELECT engine
-                FROM system.tables
-                WHERE database = {database:String}
-                  AND name = {table:String}
-                SQL,
-            [
-                'database' => $this->topology->getDatabase(),
-                'table' => $this->topology->getTable(),
-            ],
-        )->fetchOne('engine');
-
-        return $engine === null ? null : (string) $engine;
-    }
-
-    /**
      * A registry created for a different topology must never be adopted silently.
      *
      * @throws ClickhouseRegistryEngineMismatchException
@@ -217,6 +195,31 @@ final class MigrationRepository
             $actualEngine,
             $expectedEngine,
         );
+    }
+
+    /**
+     * The engine of the registry as it exists on the connected node, or `null` when
+     * there is no registry yet.
+     *
+     * `system.tables` is local to the node and carries no replicated data, so this
+     * query takes neither FINAL nor a consistency setting.
+     */
+    private function getEngine(): ?string
+    {
+        $engine = $this->client->select(
+            <<<'SQL'
+                SELECT engine
+                FROM system.tables
+                WHERE database = {database:String}
+                  AND name = {table:String}
+                SQL,
+            [
+                'database' => $this->topology->getDatabase(),
+                'table' => $this->topology->getTable(),
+            ],
+        )->fetchOne('engine');
+
+        return $engine === null ? null : (string) $engine;
     }
 
     /**

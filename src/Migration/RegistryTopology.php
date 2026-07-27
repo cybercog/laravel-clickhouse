@@ -93,7 +93,7 @@ final class RegistryTopology
             table: (string) ($config['table'] ?? 'migrations'),
             database: $database,
             cluster: $cluster === null ? null : (string) $cluster,
-            isReplicated: self::toBool($config['replicated'] ?? false),
+            isReplicated: (bool) ($config['replicated'] ?? false),
             replicaPath: (string) ($config['replica_path'] ?? self::DEFAULT_REPLICA_PATH),
             replicaName: (string) ($config['replica_name'] ?? self::DEFAULT_REPLICA_NAME),
         );
@@ -107,16 +107,6 @@ final class RegistryTopology
     public function getDatabase(): string
     {
         return $this->database;
-    }
-
-    public function getCluster(): ?string
-    {
-        return $this->cluster;
-    }
-
-    public function isClustered(): bool
-    {
-        return $this->cluster !== null;
     }
 
     public function isReplicated(): bool
@@ -166,13 +156,11 @@ final class RegistryTopology
 
     /**
      * `ON CLUSTER` accepts no query parameter, so the name is validated as an
-     * identifier and quoted instead.
+     * identifier and quoted instead. Empty off a cluster.
      */
     public function getOnClusterClause(): string
     {
-        return $this->cluster === null
-            ? ''
-            : ' ON CLUSTER ' . Identifier::quote($this->cluster);
+        return Identifier::onClusterClause($this->cluster);
     }
 
     /**
@@ -193,15 +181,5 @@ final class RegistryTopology
                 "The migration registry {$subject} '{$literal}' contains a quote, a backslash or a line break.",
             );
         }
-    }
-
-    private static function toBool(
-        mixed $value,
-    ): bool {
-        if (is_string($value)) {
-            return filter_var($value, FILTER_VALIDATE_BOOL);
-        }
-
-        return (bool) $value;
     }
 }

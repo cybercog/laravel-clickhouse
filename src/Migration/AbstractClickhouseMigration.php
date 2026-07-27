@@ -21,18 +21,13 @@ abstract class AbstractClickhouseMigration
 {
     protected Client $clickhouseClient;
     protected string $databaseName;
-    protected ?string $clusterName;
 
     public function __construct(
         ?Client $clickhouseClient = null,
         ?string $databaseName = null,
-        ?string $clusterName = null,
     ) {
         $this->clickhouseClient = $clickhouseClient ?? app(Client::class);
         $this->databaseName = $databaseName ?? config('clickhouse.connection.options.database');
-        $this->clusterName = self::normaliseClusterName(
-            $clusterName ?? config('clickhouse.migrations.cluster'),
-        );
     }
 
     public function getClickhouseClient(): Client
@@ -66,20 +61,10 @@ abstract class AbstractClickhouseMigration
      */
     public function onCluster(): string
     {
-        if ($this->clusterName === null) {
-            return '';
-        }
+        $cluster = config('clickhouse.migrations.cluster');
 
-        return 'ON CLUSTER ' . Identifier::quote($this->clusterName);
-    }
-
-    private static function normaliseClusterName(
-        ?string $clusterName,
-    ): ?string {
-        if ($clusterName === null || trim($clusterName) === '') {
-            return null;
-        }
-
-        return Identifier::ensureValid($clusterName, 'cluster name');
+        return Identifier::onClusterClause(
+            $cluster === null ? null : (string) $cluster,
+        );
     }
 }

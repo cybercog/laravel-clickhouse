@@ -47,4 +47,22 @@ final class Identifier
     ): string {
         return '`' . $identifier . '`';
     }
+
+    /**
+     * The whole `ON CLUSTER` clause, empty when no cluster is configured.
+     *
+     * A blank name is treated as no cluster at all: `env('CLICKHOUSE_MIGRATION_CLUSTER')`
+     * on an empty `.env` entry yields `''`, which is not a cluster named "".
+     *
+     * @throws ClickhouseConfigException
+     */
+    public static function onClusterClause(
+        ?string $cluster,
+    ): string {
+        if ($cluster === null || trim($cluster) === '') {
+            return '';
+        }
+
+        return 'ON CLUSTER ' . self::quote(self::ensureValid($cluster, 'cluster name'));
+    }
 }
