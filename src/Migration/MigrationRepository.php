@@ -177,7 +177,9 @@ final class MigrationRepository
             <<<'SQL'
                 EXISTS TABLE {table:Identifier}
                 SQL,
-            $this->tableBinding(),
+            [
+                'table' => $this->topology->getTable(),
+            ],
         )->fetchOne('result');
     }
 
@@ -237,7 +239,7 @@ final class MigrationRepository
                 SELECT engine
                 FROM system.tables
                 WHERE database = {database:String}
-                  AND name = {table:String}
+                AND name = {table:String}
                 SQL,
             [
                 'database' => $this->topology->getDatabase(),
@@ -279,7 +281,10 @@ final class MigrationRepository
             $sql .= "\nSETTINGS select_sequential_consistency = 1";
         }
 
-        return $this->client->select($sql, $bindings ?? $this->tableBinding());
+        return $this->client->select(
+            $sql,
+            $bindings ?? ['table' => $this->topology->getTable()],
+        );
     }
 
     /**
@@ -303,17 +308,9 @@ final class MigrationRepository
             <<<'SQL'
                 SYSTEM SYNC REPLICA {table:Identifier}
                 SQL,
-            $this->tableBinding(),
+            [
+                'table' => $this->topology->getTable(),
+            ],
         );
-    }
-
-    /**
-     * @return array{table: string}
-     */
-    private function tableBinding(): array
-    {
-        return [
-            'table' => $this->topology->getTable(),
-        ];
     }
 }
