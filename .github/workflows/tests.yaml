@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  unit:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -52,4 +52,92 @@ jobs:
           composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
 
       - name: Execute tests
-        run: vendor/bin/phpunit --testdox
+        run: vendor/bin/phpunit --testsuite Unit --testdox
+
+  # Both server suites run on the declared floor and on the current LTS: ADR 0002
+  # records a consistency defect that only reproduces on 22.8.
+  integration:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        clickhouse: ['22.8-alpine', '26.3-alpine']
+
+    name: Integration - CH ${{ matrix.clickhouse }}
+
+    env:
+      CLICKHOUSE_IMAGE: clickhouse/clickhouse-server:${{ matrix.clickhouse }}
+      CLICKHOUSE_HOST: 127.0.0.1
+      CLICKHOUSE_PORT: 8123
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: dom, curl, libxml, mbstring, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction
+
+      - name: Start ClickHouse
+        run: docker compose up -d --wait clickhouse
+
+      # --fail-on-skipped: the suite skips itself when the server is unreachable,
+      # which would otherwise report a green build that tested nothing.
+      - name: Execute tests
+        run: vendor/bin/phpunit --testsuite Integration --testdox --fail-on-skipped
+
+      - name: Server logs
+        if: failure()
+        run: docker compose logs --no-color clickhouse
+
+  cluster:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        clickhouse: ['22.8-alpine', '26.3-alpine']
+
+    name: Cluster - CH ${{ matrix.clickhouse }}
+
+    env:
+      CLICKHOUSE_IMAGE: clickhouse/clickhouse-server:${{ matrix.clickhouse }}
+      CLICKHOUSE_HOST: 127.0.0.1
+      CLICKHOUSE_CLUSTER_NAME: main
+      # Reached from the runner, not from inside the compose network, so every node
+      # is 127.0.0.1 and only the published port tells them apart.
+      CLICKHOUSE_CLUSTER_NODES: 127.0.0.1:8131,127.0.0.1:8132,127.0.0.1:8133,127.0.0.1:8134
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: dom, curl, libxml, mbstring, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction
+
+      # Only the server services — naming them keeps compose from building the php images.
+      - name: Start the cluster
+        run: docker compose -f compose.yml -f compose.cluster.yml up -d --wait keeper clickhouse-s1r1 clickhouse-s1r2 clickhouse-s2r1 clickhouse-s2r2
+
+      - name: Execute tests
+        run: vendor/bin/phpunit --testsuite Cluster --testdox --fail-on-skipped
+
+      - name: Server logs
+        if: failure()
+        run: docker compose -f compose.yml -f compose.cluster.yml logs --no-color keeper clickhouse-s1r1 clickhouse-s1r2 clickhouse-s2r1 clickhouse-s2r2
