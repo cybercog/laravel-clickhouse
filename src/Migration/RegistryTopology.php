@@ -110,9 +110,10 @@ final class RegistryTopology
     }
 
     /**
-     * The bare engine name, as `system.tables` reports it.
+     * The bare engine name, as `system.tables` reports it. `getEngineDefinition()` is
+     * the same engine with its arguments, as `CREATE TABLE` takes it.
      */
-    public function getEngine(): string
+    public function getEngineName(): string
     {
         return $this->isReplicated
             ? self::REPLICATED_ENGINE

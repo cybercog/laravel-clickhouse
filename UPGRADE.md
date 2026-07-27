@@ -102,7 +102,11 @@ new MigrationRepository(
 Neither class is bound in the container — the `Migrator` builds both — so this only affects code
 that constructed the repository directly.
 
-`AbstractClickhouseMigration` gained one method, `onCluster()`. Nothing was removed.
+`MigrationRepository::latest()` is gone. It returned the applied migrations ordered by batch and
+name descending — the shape Laravel's own repository uses to feed a rollback, which this package
+does not have by design. Nothing in the package called it. `all()` returns the same set.
+
+`AbstractClickhouseMigration` gained one method, `onCluster()`.
 
 ### Optional: enabling cluster mode
 

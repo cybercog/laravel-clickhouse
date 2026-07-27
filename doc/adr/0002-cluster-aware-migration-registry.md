@@ -61,7 +61,7 @@ That is necessary and **not sufficient**. `select_sequential_consistency` caps a
 quorum-committed part; it does not wait for the connected replica to reach it. A replica that has
 not fetched the part yet returns *fewer* rows, with no error — precisely the "second run re-applies
 migrations" failure the setting looks like it prevents. So every registry read is preceded by
-`SYSTEM SYNC REPLICA`. `exists()` and `getEngine()` are exempt: both answer questions about the
+`SYSTEM SYNC REPLICA`. `exists()` and `getEngineName()` are exempt: both answer questions about the
 connected node alone and must work before the registry exists.
 
 Doing it per read rather than once per repository is deliberate. A flag makes correctness depend on

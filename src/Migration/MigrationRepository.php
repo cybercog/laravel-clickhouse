@@ -64,30 +64,15 @@ final class MigrationRepository
      */
     public function all(): array
     {
-        return $this->pluckMigrations(
+        $rows = $this->selectRegistry(
             <<<'SQL'
                 SELECT migration
                 FROM {table:Identifier}
                 FINAL
                 SQL,
-        );
-    }
+        )->rows();
 
-    /**
-     * Get latest accepted migrations.
-     *
-     * @return list<string>
-     */
-    public function latest(): array
-    {
-        return $this->pluckMigrations(
-            <<<'SQL'
-                SELECT migration
-                FROM {table:Identifier}
-                FINAL
-                ORDER BY batch DESC, migration DESC
-                SQL,
-        );
+        return collect($rows)->pluck('migration')->all();
     }
 
     public function getNextBatchNumber(): int
@@ -181,8 +166,8 @@ final class MigrationRepository
      */
     public function ensureEngineMatchesTopology(): void
     {
-        $actualEngine = $this->getEngine();
-        $expectedEngine = $this->topology->getEngine();
+        $actualEngine = $this->getEngineName();
+        $expectedEngine = $this->topology->getEngineName();
 
         if ($actualEngine === null || $actualEngine === $expectedEngine) {
             return;
@@ -202,7 +187,7 @@ final class MigrationRepository
      * `system.tables` is local to the node and carries no replicated data, so this
      * query takes neither FINAL nor a consistency setting.
      */
-    private function getEngine(): ?string
+    private function getEngineName(): ?string
     {
         $engine = $this->client->select(
             <<<'SQL'
@@ -221,21 +206,10 @@ final class MigrationRepository
     }
 
     /**
-     * @return list<string>
-     */
-    private function pluckMigrations(
-        string $sql,
-    ): array {
-        $rows = $this->selectRegistry($sql)->rows();
-
-        return collect($rows)->pluck('migration')->all();
-    }
-
-    /**
      * Every read of the registry itself catches the connected replica up first and
      * caps itself at the last quorum-committed part.
      *
-     * `exists()` and `getEngine()` deliberately do neither, because they answer
+     * `exists()` and `getEngineName()` deliberately do neither, because they answer
      * questions about the connected node alone and have to work before the registry
      * exists.
      *

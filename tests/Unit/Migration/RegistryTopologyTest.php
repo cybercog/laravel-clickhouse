@@ -31,7 +31,7 @@ final class RegistryTopologyTest extends AbstractTestCase
         self::assertSame('analytics', $topology->getDatabase());
         self::assertSame('', $topology->getOnClusterClause());
         self::assertFalse($topology->isReplicated());
-        self::assertSame('ReplacingMergeTree', $topology->getEngine());
+        self::assertSame('ReplacingMergeTree', $topology->getEngineName());
     }
 
     public function testReplicatedTopologyUsesReplicatedEngine(): void
@@ -44,7 +44,7 @@ final class RegistryTopologyTest extends AbstractTestCase
 
         self::assertTrue($topology->isReplicated());
         self::assertSame('', $topology->getOnClusterClause());
-        self::assertSame('ReplicatedReplacingMergeTree', $topology->getEngine());
+        self::assertSame('ReplicatedReplacingMergeTree', $topology->getEngineName());
     }
 
     public function testClusteredTopologyIsReplicated(): void
@@ -57,7 +57,7 @@ final class RegistryTopologyTest extends AbstractTestCase
         );
 
         self::assertSame('ON CLUSTER `main`', $topology->getOnClusterClause());
-        self::assertSame('ReplicatedReplacingMergeTree', $topology->getEngine());
+        self::assertSame('ReplicatedReplacingMergeTree', $topology->getEngineName());
     }
 
     public function testEngineDefinitionOnASingleNode(): void
@@ -301,7 +301,7 @@ final class RegistryTopologyTest extends AbstractTestCase
         self::assertSame('analytics', $topology->getDatabase());
         self::assertSame('', $topology->getOnClusterClause());
         self::assertFalse($topology->isReplicated());
-        self::assertSame('ReplacingMergeTree', $topology->getEngine());
+        self::assertSame('ReplacingMergeTree', $topology->getEngineName());
     }
 
     public function testFromConfigReadsFullTopology(): void
