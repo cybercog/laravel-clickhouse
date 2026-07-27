@@ -7,9 +7,12 @@
     </profiles>
     <users>
         <test>
-            <profile>test</profile>
-            <password />
+            <profile>default</profile>
+            <password/>
             <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
         </test>
     </users>
 </yandex>

@@ -49,13 +49,18 @@ services:
 
   clickhouse:
     container_name: laravel-clickhouse-clickhouse
-    image: clickhouse/clickhouse-server:21.9
+    # Supported server range: 22.8 LTS and up. This pin is a dev convenience, not the
+    # contract — the minimum is enforced by the CI integration job. To test the floor:
+    # CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:22.8-alpine docker compose up -d
+    image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:25.8-alpine}
+    environment:
+      # Newer images generate a random password for the `default` user otherwise.
+      CLICKHOUSE_SKIP_USER_SETUP: 1
     volumes:
-      - ./.docker-volume-clickhouse:/var/lib/clickhouse
       - ./.docker/clickhouse/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
       - ./.docker/clickhouse/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/logging.xml:ro
     healthcheck:
-      test: wget --spider -q 0.0.0.0:8123/ping
+      test: wget --spider -q 127.0.0.1:8123/ping
       interval: 5s
       timeout: 3s
       retries: 5
@@ -66,7 +71,3 @@ services:
     ports:
       - "8123:8123"
       - "9000:9000"
-
-volumes:
-  .docker-volume-clickhouse:
-    driver: local
