@@ -119,6 +119,10 @@ php artisan clickhouse:migrate --step=1
 
 Detailed changes for each release are documented in the [CHANGELOG.md](https://github.com/cybercog/laravel-clickhouse/blob/master/CHANGELOG.md).
 
+## Upgrading
+
+Breaking changes and the steps each one requires are documented in the [UPGRADE.md](https://github.com/cybercog/laravel-clickhouse/blob/master/UPGRADE.md).
+
 ## License
 
 - `Laravel ClickHouse` package is open-sourced software licensed under the [MIT license](LICENSE) by [Anton Komarev].
