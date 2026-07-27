@@ -143,12 +143,20 @@ final class MigrationRepositoryTest extends AbstractTestCase
         );
     }
 
+    /**
+     * The whole statement, not just the setting: `SETTINGS` has to sit between the
+     * column list and `VALUES`, and the two variants are spelled out separately.
+     */
     public function testAddTakesAQuorumOnAReplicatedRegistry(): void
     {
         $this->repository($this->replicatedTopology())->add(self::MIGRATION_NAME, 4);
 
-        self::assertStringContainsString(
-            "SETTINGS insert_quorum = 'auto'",
+        self::assertSame(
+            <<<'SQL'
+                INSERT INTO {table:Identifier} (migration, batch)
+                SETTINGS insert_quorum = 'auto'
+                VALUES ({migration:String}, {batch:UInt32})
+                SQL,
             $this->lastWrite()['sql'],
         );
     }

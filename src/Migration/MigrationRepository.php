@@ -114,20 +114,28 @@ final class MigrationRepository
     /**
      * Writes go through `write()` rather than `insert()`, because `Client::insert()`
      * builds its own `INSERT ... VALUES` and cannot carry a SETTINGS clause.
+     *
+     * Spelled out twice rather than assembled, because `SETTINGS` has to sit between
+     * the column list and `VALUES`: a statement with a hole in the middle cannot be
+     * a nowdoc, and the whole point of one is that nothing here is interpolated.
      */
     public function add(
         string $migration,
         int $batch,
     ): Statement {
-        $quorum = $this->topology->isReplicated()
-            ? "\nSETTINGS insert_quorum = 'auto'"
-            : '';
+        $sql = $this->topology->isReplicated()
+            ? <<<'SQL'
+                INSERT INTO {table:Identifier} (migration, batch)
+                SETTINGS insert_quorum = 'auto'
+                VALUES ({migration:String}, {batch:UInt32})
+                SQL
+            : <<<'SQL'
+                INSERT INTO {table:Identifier} (migration, batch)
+                VALUES ({migration:String}, {batch:UInt32})
+                SQL;
 
         return $this->client->write(
-            <<<SQL
-                INSERT INTO {table:Identifier} (migration, batch){$quorum}
-                VALUES ({migration:String}, {batch:UInt32})
-                SQL,
+            $sql,
             [
                 'table' => $this->topology->getTable(),
                 'migration' => $migration,
