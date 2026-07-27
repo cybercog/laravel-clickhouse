@@ -31,13 +31,15 @@ final class RegistryTopology
 
     private const REPLICATED_ENGINE = 'ReplicatedReplacingMergeTree';
 
+    private readonly ?string $cluster;
+
     /**
      * @throws ClickhouseConfigException
      */
     public function __construct(
         private readonly string $table,
         private readonly string $database,
-        private readonly ?string $cluster = null,
+        ?string $cluster = null,
         private readonly bool $isReplicated = false,
         private readonly string $replicaPathPrefix = self::DEFAULT_REPLICA_PATH_PREFIX,
         private readonly string $replicaName = self::DEFAULT_REPLICA_NAME,
@@ -45,12 +47,14 @@ final class RegistryTopology
         Identifier::ensureValid($table, 'migration registry table name');
         Identifier::ensureValid($database, 'database name');
 
-        if ($cluster !== null) {
-            Identifier::ensureValid($cluster, 'cluster name');
+        $this->cluster = Identifier::normalizeCluster($cluster);
+
+        if ($this->cluster !== null) {
+            Identifier::ensureValid($this->cluster, 'cluster name');
 
             if ($isReplicated === false) {
                 throw new ClickhouseConfigException(
-                    "The migration registry is configured to be created ON CLUSTER '{$cluster}' "
+                    "The migration registry is configured to be created ON CLUSTER '{$this->cluster}' "
                     . 'while replication is disabled. That creates one independent registry per shard, '
                     . 'which immediately diverges. Set `clickhouse.migrations.replicated` to true, '
                     . 'or unset `clickhouse.migrations.cluster`.',
@@ -66,10 +70,6 @@ final class RegistryTopology
     }
 
     /**
-     * The cluster name is trimmed, and a blank one is no cluster at all rather than a
-     * cluster named "" — `env('CLICKHOUSE_MIGRATION_CLUSTER')` on an empty `.env` entry
-     * yields `''`. `Identifier::onClusterClause()` reads the same value the same way.
-     *
      * @param array<string, mixed> $config The `clickhouse.migrations` config section.
      *
      * @throws ClickhouseConfigException
@@ -80,14 +80,10 @@ final class RegistryTopology
     ): self {
         $cluster = $config['cluster'] ?? null;
 
-        if ($cluster !== null) {
-            $cluster = trim((string) $cluster);
-        }
-
         return new self(
             table: (string) ($config['table'] ?? 'migrations'),
             database: $database,
-            cluster: $cluster === '' ? null : $cluster,
+            cluster: $cluster === null ? null : (string) $cluster,
             isReplicated: (bool) ($config['replicated'] ?? false),
             replicaPathPrefix: (string) ($config['replica_path_prefix'] ?? self::DEFAULT_REPLICA_PATH_PREFIX),
             replicaName: (string) ($config['replica_name'] ?? self::DEFAULT_REPLICA_NAME),
@@ -102,6 +98,14 @@ final class RegistryTopology
     public function getDatabase(): string
     {
         return $this->database;
+    }
+
+    /**
+     * Normalised: never a blank name, never padded.
+     */
+    public function getCluster(): ?string
+    {
+        return $this->cluster;
     }
 
     public function isReplicated(): bool
@@ -123,13 +127,8 @@ final class RegistryTopology
     /**
      * The engine with its arguments, as `CREATE TABLE` takes it.
      *
-     * The replica path is fully resolved here — the prefix is a literal, and the
-     * database and the table are appended by this package — so only the replica name
-     * still holds macros for ClickHouse to expand on each node.
-     *
-     * It is quoted into the statement rather than bound because the statement is
-     * already interpolated for `ON CLUSTER`, and a `CREATE TABLE` that mixes text and
-     * bindings is where the driver's own `{name}` rewriting reaches the macro.
+     * The replica path is fully resolved here, so only the replica name still holds
+     * macros for ClickHouse to expand per node. Quoted rather than bound — ADR 0002 D3.
      */
     public function getEngineDefinition(): string
     {
@@ -183,12 +182,8 @@ final class RegistryTopology
 
     /**
      * The registry is replicated, never sharded: every host must resolve the same
-     * replica path, so the prefix has to be a literal.
-     *
-     * Naming the macros that differ per host would be a blocklist, and macro names are
-     * the operator's to choose — `{shard}` is only the obvious one, `{layer}` or any
-     * custom name does the same damage. Rejecting all of them is the only complete
-     * rule, and it costs nothing: the environment can be spelled out in the prefix.
+     * replica path, so the prefix has to be a literal. Rejecting every macro rather
+     * than naming `{shard}` is the only complete rule — ADR 0002 D1.
      *
      * @throws ClickhouseConfigException
      */

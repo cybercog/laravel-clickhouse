@@ -209,7 +209,7 @@ final class RegistryTopologyTest extends AbstractTestCase
         );
     }
 
-    #[DataProvider('provideInvalidIdentifiers')]
+    #[DataProvider('provideInvalidClusterNames')]
     public function testInvalidClusterIdentifierIsRejected(
         string $identifier,
     ): void {
@@ -221,6 +221,38 @@ final class RegistryTopologyTest extends AbstractTestCase
             cluster: $identifier,
             isReplicated: true,
         );
+    }
+
+    /**
+     * A blank name means no cluster wherever it comes from, not only through
+     * `fromConfig()` — the normalisation belongs to the topology, not to one caller.
+     */
+    #[DataProvider('provideBlankClusterNames')]
+    public function testABlankClusterNameIsTreatedAsAbsent(
+        string $cluster,
+    ): void {
+        $topology = new RegistryTopology(
+            table: 'migrations',
+            database: 'analytics',
+            cluster: $cluster,
+        );
+
+        self::assertNull($topology->getCluster());
+        self::assertSame('', $topology->getOnClusterClause());
+    }
+
+    /**
+     * Every invalid identifier except a blank one, which names no cluster at all.
+     *
+     * @return array<string, array{string}>
+     */
+    public static function provideInvalidClusterNames(): array
+    {
+        $identifiers = self::provideInvalidIdentifiers();
+
+        unset($identifiers['empty']);
+
+        return $identifiers;
     }
 
     /**
