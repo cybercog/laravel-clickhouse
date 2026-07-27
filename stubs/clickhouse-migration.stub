@@ -8,6 +8,9 @@ return new class extends AbstractClickhouseMigration
 {
     public function up(): void
     {
+        // On a cluster, switch to a heredoc (<<<SQL) and interpolate
+        // {$this->onCluster()} after the table name. It expands to nothing
+        // when `clickhouse.migrations.cluster` is not set.
         $this->clickhouseClient->write(
             <<<'SQL'
 

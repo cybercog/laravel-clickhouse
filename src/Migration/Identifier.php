@@ -1,0 +1,86 @@
+<?php
+
+/*
+ * This file is part of Laravel ClickHouse.
+ *
+ * (c) Anton Komarev <anton@komarev.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace Cog\Laravel\Clickhouse\Migration;
+
+use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
+
+/**
+ * ClickHouse accepts no query parameter for `ON CLUSTER`, which leaves the whole
+ * `CREATE TABLE` a statement written as text — the target name included, even
+ * though that one would bind. Those identifiers are interpolated into the SQL,
+ * which makes validating them the only thing standing between a config value and
+ * an injected statement.
+ */
+final class Identifier
+{
+    private const PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*$/';
+
+    /**
+     * @throws ClickhouseConfigException
+     */
+    public static function ensureValid(
+        string $identifier,
+        string $subject,
+    ): string {
+        if (preg_match(self::PATTERN, $identifier) !== 1) {
+            throw new ClickhouseConfigException(
+                "Invalid {$subject} '{$identifier}'. "
+                . 'It must start with a letter or an underscore and contain only letters, digits and underscores.',
+            );
+        }
+
+        return $identifier;
+    }
+
+    public static function quote(
+        string $identifier,
+    ): string {
+        return '`' . $identifier . '`';
+    }
+
+    /**
+     * A blank name is no cluster at all — `env('CLICKHOUSE_MIGRATION_CLUSTER')` on an
+     * empty `.env` entry yields `''`, which is not a cluster named "". Surrounding
+     * whitespace is insignificant, so a padded name reaches validation as the cluster
+     * it looks like.
+     */
+    public static function normalizeCluster(
+        ?string $cluster,
+    ): ?string {
+        if ($cluster === null) {
+            return null;
+        }
+
+        $cluster = trim($cluster);
+
+        return $cluster === '' ? null : $cluster;
+    }
+
+    /**
+     * The whole `ON CLUSTER` clause, empty when no cluster is configured.
+     *
+     * @throws ClickhouseConfigException
+     */
+    public static function onClusterClause(
+        ?string $cluster,
+    ): string {
+        $cluster = self::normalizeCluster($cluster);
+
+        if ($cluster === null) {
+            return '';
+        }
+
+        return 'ON CLUSTER ' . self::quote(self::ensureValid($cluster, 'cluster name'));
+    }
+}

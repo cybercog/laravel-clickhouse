@@ -1,0 +1,97 @@
+# ClickHouse cluster for the `Cluster` test suite: 1 Keeper, 2 shards x 2 replicas.
+#
+# Overlays compose.yml so the php containers share its network and can resolve
+# `clickhouse-s1r1` … `clickhouse-s2r2` by name:
+#
+#   docker compose -f compose.yml -f compose.cluster.yml up -d
+#   docker compose -f compose.yml -f compose.cluster.yml exec php85 vendor/bin/phpunit --testsuite Cluster
+#
+# Pin the server version with CLICKHOUSE_IMAGE (22.8 LTS is the supported minimum).
+# Switching versions needs --renew-anon-volumes: Keeper's raft log lives in an anonymous
+# volume that a plain recreate carries over, and 22.8 cannot read a snapshot written by a
+# newer version (`Unsupported snapshot version`, then exit 70).
+#
+#   CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:22.8-alpine docker compose -f compose.yml -f compose.cluster.yml up -d --renew-anon-volumes
+#
+# Node HTTP ports on the host: s1r1 8131, s1r2 8132, s2r1 8133, s2r2 8134. To drive the
+# suite from the host instead of a php container, name the published ports — this is what
+# the CI cluster job does:
+#
+#   CLICKHOUSE_HOST=127.0.0.1 \
+#   CLICKHOUSE_CLUSTER_NODES=127.0.0.1:8131,127.0.0.1:8132,127.0.0.1:8133,127.0.0.1:8134 \
+#   vendor/bin/phpunit --testsuite Cluster
+
+x-clickhouse: &clickhouse
+  image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:26.3-alpine}
+  environment:
+    CLICKHOUSE_SKIP_USER_SETUP: 1
+  ulimits:
+    nofile:
+      soft: 262144
+      hard: 262144
+  healthcheck:
+    test: wget --spider -q 127.0.0.1:8123/ping
+    interval: 5s
+    timeout: 3s
+    retries: 10
+  depends_on:
+    keeper:
+      condition: service_healthy
+
+services:
+  keeper:
+    image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:26.3-alpine}
+    container_name: laravel-clickhouse-keeper
+    # Keeper writes its server UUID into the coordination directory before anything
+    # creates it. 22.8 does not create it and exits; newer versions do.
+    command:
+      - sh
+      - -c
+      - mkdir -p /var/lib/clickhouse/coordination && exec clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
+    volumes:
+      - ./.docker/clickhouse-cluster/keeper.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9181; cat >&3; head -c 4 <&3' | grep -q imok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  clickhouse-s1r1:
+    <<: *clickhouse
+    container_name: laravel-clickhouse-s1r1
+    volumes:
+      - ./.docker/clickhouse-cluster/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./.docker/clickhouse-cluster/macros-s1r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ./.docker/clickhouse-cluster/users.xml:/etc/clickhouse-server/users.d/test-user.xml:ro
+    ports:
+      - "8131:8123"
+
+  clickhouse-s1r2:
+    <<: *clickhouse
+    container_name: laravel-clickhouse-s1r2
+    volumes:
+      - ./.docker/clickhouse-cluster/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./.docker/clickhouse-cluster/macros-s1r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ./.docker/clickhouse-cluster/users.xml:/etc/clickhouse-server/users.d/test-user.xml:ro
+    ports:
+      - "8132:8123"
+
+  clickhouse-s2r1:
+    <<: *clickhouse
+    container_name: laravel-clickhouse-s2r1
+    volumes:
+      - ./.docker/clickhouse-cluster/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./.docker/clickhouse-cluster/macros-s2r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ./.docker/clickhouse-cluster/users.xml:/etc/clickhouse-server/users.d/test-user.xml:ro
+    ports:
+      - "8133:8123"
+
+  clickhouse-s2r2:
+    <<: *clickhouse
+    container_name: laravel-clickhouse-s2r2
+    volumes:
+      - ./.docker/clickhouse-cluster/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./.docker/clickhouse-cluster/macros-s2r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ./.docker/clickhouse-cluster/users.xml:/etc/clickhouse-server/users.d/test-user.xml:ro
+    ports:
+      - "8134:8123"

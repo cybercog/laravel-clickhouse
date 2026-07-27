@@ -19,6 +19,20 @@ This package includes generation and execution of the ClickHouse database migrat
 - Migration creation
 - Migration execution
 
+## Requirements
+
+| Requirement       | Version         |
+|-------------------|-----------------|
+| PHP               | 8.2+            |
+| Laravel           | 11, 12, 13      |
+| ClickHouse server | 22.8 LTS and up |
+
+Only [ClickHouse LTS releases] are supported. Non-LTS releases are not tested against and may work
+by coincidence, but nothing in this package is designed or verified around them.
+
+The reasoning behind the minimum server version is recorded in
+[ADR 0001](doc/adr/0001-minimum-clickhouse-server-version.md).
+
 ## Installation
 
 Pull in the package through [Composer](https://getcomposer.org/).
@@ -101,9 +115,54 @@ php artisan clickhouse:migrate --step=1
 
 > Rolling back migrations is intentionally unavailable. Migrations should go only forward.
 
+#### Running on a cluster
+
+By default the migration registry is a local `ReplacingMergeTree` — correct for a single node, and
+wrong behind a load balancer, where each node would keep its own view of which migrations have been
+applied.
+
+Cluster mode requires ClickHouse Keeper (or ZooKeeper) and a `remote_servers` entry naming the
+cluster. Enable it with:
+
+```dotenv
+CLICKHOUSE_MIGRATION_CLUSTER=main
+CLICKHOUSE_MIGRATION_REPLICATED=true
+```
+
+The registry then becomes a `ReplicatedReplacingMergeTree` created `ON CLUSTER`, and
+`clickhouse:migrate` is safe to run from any node.
+
+One rule the configuration cannot infer for you: **`CLICKHOUSE_MIGRATION_REPLICA_NAME` must be
+unique cluster-wide.** It defaults to the `{replica}` macro. If `{replica}` repeats across shards in
+your `macros.xml`, set it to `{shard}-{replica}` — two nodes claiming one replica fail with
+`REPLICA_ALREADY_EXISTS`.
+
+The replica path is `CLICKHOUSE_MIGRATION_REPLICA_PATH_PREFIX` (`/clickhouse/tables`) followed by
+your database and table name. Change the prefix only to keep several installations apart in a shared
+Keeper, and write the value out literally — a macro in the prefix is rejected, because one that
+resolves differently per host would split the registry into a history per group of hosts, which is
+the bug cluster mode exists to fix.
+
+Migrations themselves opt into `ON CLUSTER` with `onCluster()`, which returns the whole clause and
+collapses to nothing where no cluster is configured, so one file serves both deployments:
+
+```php
+$this->clickhouseClient->write(
+    "CREATE TABLE events {$this->onCluster()} (id UInt32) ENGINE = MergeTree ORDER BY id",
+);
+```
+
+Converting a registry created before cluster mode was enabled is a manual step — the recipe is in
+[UPGRADE.md](UPGRADE.md). The design is recorded in
+[ADR 0002](doc/adr/0002-cluster-aware-migration-registry.md).
+
 ## Changelog
 
 Detailed changes for each release are documented in the [CHANGELOG.md](https://github.com/cybercog/laravel-clickhouse/blob/master/CHANGELOG.md).
+
+## Upgrading
+
+Breaking changes and the steps each one requires are documented in the [UPGRADE.md](https://github.com/cybercog/laravel-clickhouse/blob/master/UPGRADE.md).
 
 ## License
 
@@ -121,6 +180,7 @@ Detailed changes for each release are documented in the [CHANGELOG.md](https://g
 <a href="https://cybercog.su"><img src="https://cloud.githubusercontent.com/assets/1849174/18418932/e9edb390-7860-11e6-8a43-aa3fad524664.png" alt="CyberCog"></a>
 
 [Anton Komarev]: https://komarev.com
+[ClickHouse LTS releases]: https://clickhouse.com/docs/faq/operations/production
 [CyberCog]: https://cybercog.su
 [Follow us on Twitter]: https://twitter.com/cybercog
 [smi2/phpClickHouse]: https://github.com/smi2/phpClickHouse#start

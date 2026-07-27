@@ -1,0 +1,19 @@
+<yandex>
+    <profiles>
+        <default>
+            <log_queries>0</log_queries>
+            <log_query_threads>0</log_query_threads>
+        </default>
+    </profiles>
+    <users>
+        <test>
+            <profile>default</profile>
+            <password/>
+            <quota>default</quota>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <access_management>1</access_management>
+        </test>
+    </users>
+</yandex>

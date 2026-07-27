@@ -13,13 +13,11 @@ declare(strict_types=1);
 
 namespace Cog\Laravel\Clickhouse\Migration;
 
-use ClickHouseDB\Client;
 use DomainException;
 use Generator;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use ReflectionClass;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -28,7 +26,6 @@ use function in_array;
 final class Migrator
 {
     public function __construct(
-        private readonly Client $client,
         private readonly MigrationRepository $repository,
         private readonly Filesystem $filesystem,
     ) {}
@@ -54,8 +51,6 @@ final class Migrator
         $nextBatch = $this->repository->getNextBatchNumber();
 
         for ($i = $step; ($i > 0 || $step === 0) && $migrations->valid(); $i--) {
-            $this->filesystem->requireOnce($migrations->current());
-
             $startTime = microtime(true);
 
             $migration = $this->resolveMigrationInstance($migrations->current());
@@ -75,15 +70,23 @@ final class Migrator
         }
     }
 
+    /**
+     * `EXISTS TABLE` only reflects the node the client happens to talk to, so it
+     * cannot gate an `ON CLUSTER` create. The create is issued unconditionally and
+     * is idempotent — but only after making sure the registry that may already be
+     * there was built for the configured topology.
+     */
     public function ensureTableExists(): self
     {
-        if ($this->repository->exists() === false) {
-            $this->repository->createMigrationRegistryTable();
-        }
+        $this->repository->ensureEngineMatchesTopology();
+        $this->repository->createMigrationRegistryTable();
 
         return $this;
     }
 
+    /**
+     * @return Generator<int, string, mixed, void> Absolute paths, in file order.
+     */
     private function getMigrationsUp(
         string $migrationsDirectoryPath,
     ): Generator {
@@ -101,44 +104,49 @@ final class Migrator
     }
 
     /**
+     * The registry is read once per run, not once per file: in replicated mode every
+     * read drains the replication queue, so a per-file check would make a deploy pay
+     * for it as many times as the directory has migrations.
+     *
      * @return list<SplFileInfo>
      */
     private function getUnAppliedMigrationFiles(
         string $migrationsDirectoryPath,
     ): array {
-        $migrationFiles = $this->filesystem->files($migrationsDirectoryPath);
+        $appliedMigrations = $this->repository->all();
 
-        return collect($migrationFiles)
+        return collect($this->filesystem->files($migrationsDirectoryPath))
             ->reject(
-                fn(SplFileInfo $migrationFile) => $this->isAppliedMigration($migrationFile->getFilename()),
+                fn(SplFileInfo $migrationFile) => in_array(
+                    $this->getMigrationName($migrationFile->getFilename()),
+                    $appliedMigrations,
+                    true,
+                ),
             )->all();
     }
 
     /**
+     * A migration file returns the anonymous class it declares, already built — it
+     * reaches for its own client, because nothing here can hand it one.
+     *
      * @throws FileNotFoundException
      */
     private function resolveMigrationInstance(
         string $path,
     ): object {
-        $class = $this->generateMigrationClassName($this->getMigrationName($path));
-
-        if (class_exists($class) && realpath($path) === (new ReflectionClass($class))->getFileName()) {
-            return new $class($this->client);
-        }
-
         $migration = $this->filesystem->getRequire($path);
 
-        return is_object($migration) ? $migration : new $class($this->client);
+        if (is_object($migration) === false) {
+            throw new DomainException("Migration {$path} must return a migration instance");
+        }
+
+        return $migration;
     }
 
-    private function generateMigrationClassName(
-        string $migrationName,
-    ): string {
-        return Str::studly(
-            implode('_', array_slice(explode('_', $migrationName), 4)),
-        );
-    }
-
+    /**
+     * Read off the file the class was declared in, which is why only anonymous
+     * classes are supported: a named one could be declared anywhere.
+     */
     private function resolveMigrationNameFromInstance(
         object $migration,
     ): string {
@@ -149,15 +157,5 @@ final class Migrator
         }
 
         return $this->getMigrationName($reflectionClass->getFileName());
-    }
-
-    private function isAppliedMigration(
-        string $fileName,
-    ): bool {
-        return in_array(
-            $this->getMigrationName($fileName),
-            $this->repository->all(),
-            true,
-        );
     }
 }

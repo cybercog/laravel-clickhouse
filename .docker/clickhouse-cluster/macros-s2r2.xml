@@ -1,0 +1,8 @@
+<yandex>
+    <macros>
+        <cluster>main</cluster>
+        <shard>02</shard>
+        <!-- Unique cluster-wide, not just within the shard. -->
+        <replica>02-02</replica>
+    </macros>
+</yandex>
