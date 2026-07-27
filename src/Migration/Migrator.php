@@ -75,11 +75,16 @@ final class Migrator
         }
     }
 
+    /**
+     * `EXISTS TABLE` only reflects the node the client happens to talk to, so it
+     * cannot gate an `ON CLUSTER` create. The create is issued unconditionally and
+     * is idempotent — but only after making sure the registry that may already be
+     * there was built for the configured topology.
+     */
     public function ensureTableExists(): self
     {
-        if ($this->repository->exists() === false) {
-            $this->repository->createMigrationRegistryTable();
-        }
+        $this->repository->ensureEngineMatchesTopology();
+        $this->repository->createMigrationRegistryTable();
 
         return $this;
     }
@@ -128,7 +133,18 @@ final class Migrator
 
         $migration = $this->filesystem->getRequire($path);
 
-        return is_object($migration) ? $migration : new $class($this->client);
+        if (is_object($migration) === false) {
+            return new $class($this->client);
+        }
+
+        if ($migration instanceof AbstractClickhouseMigration) {
+            // Anonymous migrations are constructed by the file itself, so they would
+            // otherwise fall back to the application-facing client and run under its
+            // query timeout.
+            $migration->setClickhouseClient($this->client);
+        }
+
+        return $migration;
     }
 
     private function generateMigrationClassName(

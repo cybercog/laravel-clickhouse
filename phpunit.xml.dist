@@ -4,8 +4,8 @@
   xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
   bootstrap="vendor/autoload.php"
   colors="true"
-  stopOnFailure="true"
   cacheDirectory=".phpunit.cache"
+  defaultTestSuite="Unit"
 >
   <source>
     <include>
@@ -13,8 +13,17 @@
     </include>
   </source>
   <testsuites>
+    <!-- No infrastructure. Runs on every CI matrix job. -->
     <testsuite name="Unit">
-      <directory suffix="Test.php">./tests</directory>
+      <directory suffix="Test.php">./tests/Unit</directory>
+    </testsuite>
+    <!-- Needs the `clickhouse` service from compose.yml. -->
+    <testsuite name="Integration">
+      <directory suffix="Test.php">./tests/Integration</directory>
+    </testsuite>
+    <!-- Needs compose.cluster.yml: 1 Keeper, 2 shards x 2 replicas. -->
+    <testsuite name="Cluster">
+      <directory suffix="Test.php">./tests/Cluster</directory>
     </testsuite>
   </testsuites>
   <php>
@@ -24,5 +33,7 @@
     <server name="CLICKHOUSE_USER" value="test"/>
     <server name="CLICKHOUSE_PASSWORD" value=""/>
     <server name="CLICKHOUSE_DATABASE" value="default"/>
+    <server name="CLICKHOUSE_CLUSTER_NAME" value="main"/>
+    <server name="CLICKHOUSE_CLUSTER_NODES" value="clickhouse-s1r1,clickhouse-s1r2,clickhouse-s2r1,clickhouse-s2r2"/>
   </php>
 </phpunit>

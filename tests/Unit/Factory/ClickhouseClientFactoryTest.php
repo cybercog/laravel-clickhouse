@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace Cog\Tests\Laravel\Clickhouse\Factory;
+namespace Cog\Tests\Laravel\Clickhouse\Unit\Factory;
 
 use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 use Cog\Laravel\Clickhouse\Factory\ClickhouseClientFactory;

@@ -1,0 +1,60 @@
+<yandex>
+    <logger>
+        <level>warning</level>
+        <console>true</console>
+    </logger>
+
+    <listen_host>0.0.0.0</listen_host>
+
+    <!-- Stop all the unnecessary logging -->
+    <query_thread_log remove="remove"/>
+    <query_log remove="remove"/>
+    <text_log remove="remove"/>
+    <trace_log remove="remove"/>
+    <metric_log remove="remove"/>
+    <asynchronous_metric_log remove="remove"/>
+
+    <zookeeper>
+        <node>
+            <host>keeper</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <!--
+        2 shards x 2 replicas.
+
+        Replica names in macros-*.xml are unique cluster-wide (`{shard}-{replica}`),
+        which is what a shard-free ZooKeeper path for the migration registry requires.
+    -->
+    <remote_servers>
+        <main>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>clickhouse-s1r1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>clickhouse-s1r2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>clickhouse-s2r1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>clickhouse-s2r2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </main>
+    </remote_servers>
+
+    <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+    </distributed_ddl>
+</yandex>
