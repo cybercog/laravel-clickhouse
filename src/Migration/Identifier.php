@@ -16,10 +16,11 @@ namespace Cog\Laravel\Clickhouse\Migration;
 use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 
 /**
- * ClickHouse accepts no query parameter for `ON CLUSTER`, and none for the
- * `CREATE TABLE` target on the versions this package supports. Those identifiers
- * are therefore interpolated into the SQL, which makes validating them the only
- * thing standing between a config value and an injected statement.
+ * ClickHouse accepts no query parameter for `ON CLUSTER`, which leaves the whole
+ * `CREATE TABLE` a statement written as text — the target name included, even
+ * though that one would bind. Those identifiers are interpolated into the SQL,
+ * which makes validating them the only thing standing between a config value and
+ * an injected statement.
  */
 final class Identifier
 {

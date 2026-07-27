@@ -77,10 +77,23 @@ provides none.
 ### D3 — Three values are interpolated; everything else is a query parameter
 
 Reads, the `INSERT` and the `EXISTS` probe are fully parameterised: identifiers and values reach the
-server as `param_*`. The `CREATE TABLE` is the exception, and only where the server forces it —
-`ON CLUSTER` accepts no query parameter, and query parameters do **not** expand macros. Sending
-`param_replica={replica}` inserts nine literal characters, which on a real cluster produced
-`REPLICA_ALREADY_EXISTS` with two nodes claiming one replica.
+server as `param_*`. The `CREATE TABLE` is the exception, and one clause forces it: `ON CLUSTER`
+accepts no query parameter. `ON CLUSTER {cluster:Identifier}` is a `SYNTAX_ERROR` — *Expected one of:
+identifier, string literal* — so the cluster name has to be in the query text.
+
+That decides the rest of the statement. Once the text carries the engine definition, it carries the
+replica name's macros with it, and the driver rewrites every `{name}` it finds in the text from the
+bindings before sending: `Bindings::process()` runs `preg_replace_callback('#{([\w+]+)}#')` twice
+over the SQL on every query. Typed `{x:Type}` parameters survive the pass — the colon keeps them out
+of the pattern — but a bare `{replica}` does not, so a single binding by that name would consume the
+macro the server was supposed to expand. The DDL therefore carries no bindings at all, which is a
+property of the statement rather than of each value in it.
+
+The server itself is not the obstacle here, and an earlier draft of this ADR said it was. Measured on
+22.8 and 26.3, through curl and through the driver: `ENGINE = ReplicatedReplacingMergeTree({path:String},
+{replica:String})` with `param_replica={replica}` creates the table with `replica_name = 01-01`, the
+node's macro, correctly expanded. `{table:Identifier}` in `CREATE TABLE` works on 22.8 too. Neither
+changes the decision, because `ON CLUSTER` still cannot be bound.
 
 The cluster name is validated as an identifier (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and backtick-quoted;
 the ZooKeeper path prefix and the replica name are rejected if they contain a quote, a backslash or
@@ -114,8 +127,8 @@ $this->clickhouseClient->write(
 
 Exposing the raw cluster name instead would force every migration to write `ON CLUSTER {cluster}`
 and break on single-node deployments, where the correct output is nothing at all. Exposing it as a
-*binding* would be worse: the driver's `Bindings::process()` runs a raw `str_replace` over `{name}`,
-so a `{database}` binding silently eats the ClickHouse `{database}` macro in a replica path.
+*binding* would be worse: the driver rewrites `{name}` in the query text from the bindings, so a
+`{database}` binding silently eats the ClickHouse `{database}` macro in a replica path (D3).
 
 ### D7 — The migrator gets its own client and its own timeout
 
@@ -150,8 +163,11 @@ a green build that tested nothing.
 Two findings came out of running it, and neither would have surfaced on a single node or on a
 current release alone:
 
-- **Query parameters do not expand macros.** `param_replica={replica}` produced
-  `REPLICA_ALREADY_EXISTS` — two nodes claiming one replica (D3).
+- **A replica name that repeats across nodes fails loudly.** `replica_name = {shard}` is shared by
+  both replicas of a shard, and the second one to arrive gets `REPLICA_ALREADY_EXISTS`. That is the
+  one rule the configuration cannot check for the operator, so the suite pins the failure instead
+  (D3). An earlier revision of this ADR blamed the same error on query parameters not expanding
+  macros; that explanation was wrong — see D3 for what was actually measured.
 - **`select_sequential_consistency` does not wait.** On 22.8 a quorum `INSERT` on `s1r1` followed
   immediately by a sequential-consistency read on `s2r2` returns nothing, then returns the row a
   moment later. 26.3 usually wins the race, which hides the defect rather than fixing it (D2). This

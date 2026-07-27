@@ -125,9 +125,11 @@ final class RegistryTopology
      *
      * The replica path is fully resolved here — the prefix is a literal, and the
      * database and the table are appended by this package — so only the replica name
-     * still holds macros for ClickHouse to expand on each node. That is why the name
-     * is interpolated rather than bound: ClickHouse does not expand macros passed
-     * through query parameters.
+     * still holds macros for ClickHouse to expand on each node.
+     *
+     * It is quoted into the statement rather than bound because the statement is
+     * already interpolated for `ON CLUSTER`, and a `CREATE TABLE` that mixes text and
+     * bindings is where the driver's own `{name}` rewriting reaches the macro.
      */
     public function getEngineDefinition(): string
     {

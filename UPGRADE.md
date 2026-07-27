@@ -13,9 +13,10 @@ its `EXISTS TABLE` probe, which the server rejects with `SYNTAX_ERROR` before 22
 `INSERT … SETTINGS`, which arrived in 22.8. Earlier releases substituted identifiers client-side and
 worked on 21.9, the version `compose.yml` used to pin.
 
-The `CREATE TABLE` is the exception: `ON CLUSTER` accepts no query parameter, and neither the
-ZooKeeper path nor the replica name may be one, because ClickHouse does not expand macros passed as
-parameters. Those values are validated as identifiers and quoted instead.
+The `CREATE TABLE` is the exception, because `ON CLUSTER` accepts no query parameter. Interpolating
+that clause puts the engine definition in the query text as well, macros and all, and the driver
+rewrites `{name}` in the text from the bindings — so the statement carries no bindings at all. The
+cluster name, the ZooKeeper path and the replica name are validated and quoted instead.
 
 Only LTS releases are supported. The reasoning, and the measured capability matrix behind the
 number, are in [ADR 0001](doc/adr/0001-minimum-clickhouse-server-version.md).

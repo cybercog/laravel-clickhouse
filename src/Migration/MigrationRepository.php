@@ -21,11 +21,16 @@ use Cog\Laravel\Clickhouse\Exception\ClickhouseRegistryEngineMismatchException;
  * Reads and writes the table that records which migrations have been applied.
  *
  * Everything but the `CREATE TABLE` is fully parameterised: the server resolves
- * both identifiers and values from `param_*`. The DDL is the exception, and only
- * where it has to be — `ON CLUSTER` accepts no query parameter, and neither the
- * ZooKeeper path nor the replica name may be one, because ClickHouse does not
- * expand macros passed as parameters. Those three values are validated by
- * RegistryTopology.
+ * both identifiers and values from `param_*`. The DDL is the exception, because
+ * `ON CLUSTER` accepts no query parameter — the server wants an identifier or a
+ * string literal in the query text itself.
+ *
+ * Interpolating the clause drags the rest along. The engine definition then sits
+ * in the query text too, replica-name macros and all, and the driver rewrites
+ * every `{name}` it finds there from the bindings before sending — so one binding
+ * named `replica` would eat the `{replica}` the server was meant to expand. The
+ * DDL therefore carries no bindings at all, and RegistryTopology validates the
+ * three values that reach it as text.
  */
 final class MigrationRepository
 {
