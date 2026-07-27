@@ -77,9 +77,6 @@ final class ClickhouseServiceProvider extends ServiceProvider
             Migrator::class,
             static function (Application $app): Migrator {
                 $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
-                $filesystem = $app->get(Filesystem::class);
-
-                $client = $app->get(AbstractClickhouseMigration::CLIENT);
 
                 $topology = RegistryTopology::fromConfig(
                     $appConfigRepository->get('clickhouse.migrations', []),
@@ -87,9 +84,11 @@ final class ClickhouseServiceProvider extends ServiceProvider
                 );
 
                 return new Migrator(
-                    $client,
-                    new MigrationRepository($client, $topology),
-                    $filesystem,
+                    new MigrationRepository(
+                        $app->get(AbstractClickhouseMigration::CLIENT),
+                        $topology,
+                    ),
+                    $app->get(Filesystem::class),
                 );
             },
         );

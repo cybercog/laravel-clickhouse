@@ -107,7 +107,6 @@ final class MigratorTest extends AbstractIntegrationTestCase
         MigrationRepository $repository,
     ): Migrator {
         return new Migrator(
-            $this->client(),
             $repository,
             $this->app->get(Filesystem::class),
         );

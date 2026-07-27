@@ -20,8 +20,11 @@ use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
 use Cog\Laravel\Clickhouse\Migration\Migrator;
 use Cog\Laravel\Clickhouse\Migration\RegistryTopology;
 use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
+use Illuminate\Console\OutputStyle;
 use Illuminate\Filesystem\Filesystem;
 use PHPUnit\Framework\MockObject\MockObject;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 final class MigratorTest extends AbstractTestCase
 {
@@ -90,6 +93,34 @@ final class MigratorTest extends AbstractTestCase
         self::assertSame($migrator, $migrator->ensureTableExists());
     }
 
+    /**
+     * Once per run, not once per file. In replicated mode every registry read drains
+     * the replication queue, so a per-file check would make a deploy pay for it as
+     * many times as the directory has migrations.
+     */
+    public function testTheRegistryIsReadOnceRegardlessOfHowManyMigrationsThereAre(): void
+    {
+        $this->recordStatements(engine: 'ReplicatedReplacingMergeTree');
+
+        $this->migrator($this->clusteredTopology())->runUp(
+            __DIR__ . '/../../fixtures/migrations/pair',
+            new OutputStyle(new ArrayInput([]), new BufferedOutput()),
+            0,
+        );
+
+        $reads = array_filter(
+            $this->selectedSql,
+            static fn(string $sql): bool => str_contains($sql, 'FROM {table:Identifier}'),
+        );
+        $inserts = array_filter(
+            $this->writtenSql,
+            static fn(string $sql): bool => str_starts_with($sql, 'INSERT INTO'),
+        );
+
+        self::assertCount(2, $inserts, 'Both fixtures ran.');
+        self::assertCount(2, $reads, 'One read lists the applied migrations, one takes the batch number.');
+    }
+
     private function recordStatements(
         ?string $engine,
     ): void {
@@ -111,8 +142,12 @@ final class MigratorTest extends AbstractTestCase
 
                     $statement = $this->createMock(Statement::class);
                     $statement
-                        ->method('fetchOne')
-                        ->willReturn($engine);
+                        ->method('rows')
+                        ->willReturn(
+                            str_contains($sql, 'system.tables') && $engine !== null
+                                ? [['engine' => $engine]]
+                                : [],
+                        );
 
                     return $statement;
                 },
@@ -123,7 +158,6 @@ final class MigratorTest extends AbstractTestCase
         RegistryTopology $topology,
     ): Migrator {
         return new Migrator(
-            $this->client,
             new MigrationRepository($this->client, $topology),
             new Filesystem(),
         );
