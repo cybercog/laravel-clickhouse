@@ -89,6 +89,9 @@ final class Migrator
         return $this;
     }
 
+    /**
+     * @return Generator<int, string, mixed, void> Absolute paths, in file order.
+     */
     private function getMigrationsUp(
         string $migrationsDirectoryPath,
     ): Generator {
