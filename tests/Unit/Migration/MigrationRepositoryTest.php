@@ -204,7 +204,12 @@ final class MigrationRepositoryTest extends AbstractTestCase
         self::assertCount(2, $this->writes);
 
         foreach ($this->writes as $write) {
-            self::assertSame('SYSTEM SYNC REPLICA {table:Identifier}', $write['sql']);
+            self::assertSame(
+                <<<'SQL'
+                    SYSTEM SYNC REPLICA {table:Identifier}
+                    SQL,
+                $write['sql'],
+            );
             self::assertSame(['table' => 'migrations'], $write['bindings']);
         }
     }
@@ -285,7 +290,12 @@ final class MigrationRepositoryTest extends AbstractTestCase
         $this->selectResult = $this->statementWithFetchOne('result', '1');
 
         self::assertTrue($this->repository()->exists());
-        self::assertSame('EXISTS TABLE {table:Identifier}', $this->selects[0]['sql']);
+        self::assertSame(
+            <<<'SQL'
+                EXISTS TABLE {table:Identifier}
+                SQL,
+            $this->selects[0]['sql'],
+        );
     }
 
     public function testFind(): void

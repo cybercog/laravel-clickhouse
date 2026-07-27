@@ -28,7 +28,13 @@ final class MigratorTest extends AbstractIntegrationTestCase
 
     protected function tearDown(): void
     {
-        $this->client()->write('DROP TABLE IF EXISTS test_integration_events SYNC', [], false);
+        $this->client()->write(
+            <<<'SQL'
+                DROP TABLE IF EXISTS test_integration_events SYNC
+                SQL,
+            [],
+            false,
+        );
 
         parent::tearDown();
     }

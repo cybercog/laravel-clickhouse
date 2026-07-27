@@ -59,7 +59,12 @@ final class ClusterRegistryTest extends AbstractClusterTestCase
         foreach ($this->nodes() as $node) {
             $row = $this->client($node)
                 ->select(
-                    'SELECT zookeeper_path, total_replicas FROM system.replicas WHERE database = {database:String} AND table = {table:String}',
+                    <<<'SQL'
+                        SELECT zookeeper_path, total_replicas
+                        FROM system.replicas
+                        WHERE database = {database:String}
+                          AND table = {table:String}
+                        SQL,
                     [
                         'database' => $this->database(),
                         'table' => $table,
@@ -174,7 +179,15 @@ final class ClusterRegistryTest extends AbstractClusterTestCase
         $table = $this->registerClusterTable();
 
         $this->firstNode()->write(
-            "CREATE TABLE `{$table}` (migration String, batch UInt32, applied_at DateTime DEFAULT now()) ENGINE = ReplacingMergeTree ORDER BY migration",
+            <<<SQL
+                CREATE TABLE `{$table}` (
+                    migration String,
+                    batch UInt32,
+                    applied_at DateTime DEFAULT now()
+                )
+                ENGINE = ReplacingMergeTree
+                ORDER BY migration
+                SQL,
         );
 
         $repository = $this->repositoryOn($this->firstNode(), $table);

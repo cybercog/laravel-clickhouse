@@ -21,6 +21,10 @@ use Cog\Laravel\Clickhouse\Migration\AbstractClickhouseMigration;
 return new class extends AbstractClickhouseMigration {
     public function up(): void
     {
-        $this->clickhouseClient->write('SELECT sleep(3)');
+        $this->clickhouseClient->write(
+            <<<'SQL'
+                SELECT sleep(3)
+                SQL,
+        );
     }
 };

@@ -38,7 +38,13 @@ abstract class AbstractIntegrationTestCase extends AbstractTestCase
         foreach ($this->createdTables as [$client, $table, $cluster]) {
             $onCluster = $cluster === null ? '' : " ON CLUSTER `{$cluster}`";
 
-            $client->write("DROP TABLE IF EXISTS `{$table}`{$onCluster} SYNC", [], false);
+            $client->write(
+                <<<SQL
+                    DROP TABLE IF EXISTS `{$table}`{$onCluster} SYNC
+                    SQL,
+                [],
+                false,
+            );
         }
 
         $this->createdTables = [];

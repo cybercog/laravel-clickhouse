@@ -154,7 +154,15 @@ final class MigrationRegistryTest extends AbstractIntegrationTestCase
         $client = $this->client();
 
         $client->write(
-            "CREATE TABLE `{$table}` (migration String, batch UInt32, applied_at DateTime DEFAULT now()) ENGINE = MergeTree ORDER BY migration",
+            <<<SQL
+                CREATE TABLE `{$table}` (
+                    migration String,
+                    batch UInt32,
+                    applied_at DateTime DEFAULT now()
+                )
+                ENGINE = MergeTree
+                ORDER BY migration
+                SQL,
         );
 
         $repository = new MigrationRepository($client, $this->topology($table));

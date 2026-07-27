@@ -153,7 +153,9 @@ final class MigrationRepository
     public function exists(): bool
     {
         return (bool) $this->client->select(
-            'EXISTS TABLE {table:Identifier}',
+            <<<'SQL'
+                EXISTS TABLE {table:Identifier}
+                SQL,
             $this->tableBinding(),
         )->fetchOne('result');
     }
@@ -277,7 +279,9 @@ final class MigrationRepository
         }
 
         $this->client->write(
-            'SYSTEM SYNC REPLICA {table:Identifier}',
+            <<<'SQL'
+                SYSTEM SYNC REPLICA {table:Identifier}
+                SQL,
             $this->tableBinding(),
         );
     }
