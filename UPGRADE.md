@@ -39,16 +39,27 @@ Or add them by hand to `config/clickhouse.php` under `migrations`:
 'timeout' => (int) env('CLICKHOUSE_MIGRATION_TIMEOUT', 180),
 'cluster' => env('CLICKHOUSE_MIGRATION_CLUSTER'),
 'replicated' => (bool) env('CLICKHOUSE_MIGRATION_REPLICATED', false),
-'replica_path' => env('CLICKHOUSE_MIGRATION_REPLICA_PATH', '/clickhouse/tables/{database}/{table}'),
+'replica_path_prefix' => env('CLICKHOUSE_MIGRATION_REPLICA_PATH_PREFIX', '/clickhouse/tables'),
 'replica_name' => env('CLICKHOUSE_MIGRATION_REPLICA_NAME', '{replica}'),
+```
+
+The application query timeout became an env var too, under `connection.options`, so that it can be
+raised without publishing the config:
+
+```php
+'timeout' => (int) env('CLICKHOUSE_QUERY_TIMEOUT', 1),
 ```
 
 ### Behaviour changes
 
 **Migrations run on their own client.** `connection.options.timeout` reaches ClickHouse as
 `max_execution_time` on every request, so an application tuned to a short timeout could not run
-`ON CLUSTER` DDL at all. The migrator now builds its own client from `migrations.timeout`
-(180 seconds by default, matching `distributed_ddl_task_timeout`).
+`ON CLUSTER` DDL at all. The two timeouts are now separate settings: `CLICKHOUSE_QUERY_TIMEOUT`
+(1 second, as before) for the application client, and `migrations.timeout` /
+`CLICKHOUSE_MIGRATION_TIMEOUT` (180 seconds, matching `distributed_ddl_task_timeout`) for a second
+client the container registers under `AbstractClickhouseMigration::CLIENT`. A migration resolves
+that key when nothing hands it a client, so it gets the migration timeout whether the migrator
+built it or not.
 
 The practical consequence: inside a migration, `getClickhouseClient()` returns that client and not
 the `ClickHouseDB\Client` singleton. If you mutate the singleton at runtime — for example
@@ -69,9 +80,6 @@ A registry created by 0.2 reports `ReplacingMergeTree`, which is what the defaul
 so a standard upgrade passes this check. It only fires if you created the registry by hand on a
 different engine, or if you enable `replicated` on an installation that already has a plain one —
 see *Enabling cluster mode* below.
-
-**`Migrator` is bound with `bind()`, not `singleton()`.** `app(Migrator::class)` now returns a fresh
-instance, and a fresh ClickHouse client with it, on every resolution.
 
 ### API changes
 
@@ -110,14 +118,14 @@ CLICKHOUSE_MIGRATION_REPLICATED=true
 engine is one independent table per shard, and they diverge from the first migration onwards. The
 package rejects that combination at wiring time rather than at the first divergent read.
 
-Two rules the configuration cannot infer for you:
+One rule the configuration cannot infer for you: **`replica_name` must be unique cluster-wide.** If
+`{replica}` repeats across shards in your macros, use `{shard}-{replica}`. Two nodes claiming one
+replica fail with `REPLICA_ALREADY_EXISTS`.
 
-- **`replica_name` must be unique cluster-wide.** If `{replica}` repeats across shards in your
-  macros, use `{shard}-{replica}`. Two nodes claiming one replica fail with
-  `REPLICA_ALREADY_EXISTS`.
-- **`replica_path` must not contain `{shard}`.** The registry is replicated, never sharded — a
-  `{shard}` in the path gives each shard its own view of which migrations have been applied, which
-  is the bug cluster mode exists to fix. This one *is* rejected for you.
+The replica path is `replica_path_prefix` followed by your database and table name. Change the
+prefix only to keep several installations apart in a shared Keeper, and spell the value out — a
+macro in the prefix *is* rejected, because one that resolves differently per host gives each group
+of hosts its own view of which migrations have been applied.
 
 **Writing migrations that work on both topologies.** `onCluster()` returns the whole clause, so it
 collapses to nothing where no cluster is configured. Interpolate it — do not pass it as a binding:
@@ -147,9 +155,9 @@ RENAME TABLE migrations TO migrations_local_backup, migrations_replicated TO mig
 ```
 
 Write the ZooKeeper path out in full, with your database and table name in place of
-`analytics`/`migrations`: the package substitutes `{database}` and `{table}` in `replica_path`
-itself, so the path here has to match what it produces. Leave `{replica}` alone — that one is a
-macro the server expands per node.
+`analytics`/`migrations`: the package appends both to `replica_path_prefix` itself, so the path here
+has to match what it produces. Leave `{replica}` alone — that one is a macro the server expands per
+node.
 
 Then set `CLICKHOUSE_MIGRATION_REPLICATED=true` and `CLICKHOUSE_MIGRATION_CLUSTER`, and run
 `php artisan clickhouse:migrate` — the `CREATE TABLE IF NOT EXISTS … ON CLUSTER` will create the

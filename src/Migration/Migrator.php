@@ -133,18 +133,7 @@ final class Migrator
 
         $migration = $this->filesystem->getRequire($path);
 
-        if (is_object($migration) === false) {
-            return new $class($this->client);
-        }
-
-        if ($migration instanceof AbstractClickhouseMigration) {
-            // Anonymous migrations are constructed by the file itself, so they would
-            // otherwise fall back to the application-facing client and run under its
-            // query timeout.
-            $migration->setClickhouseClient($this->client);
-        }
-
-        return $migration;
+        return is_object($migration) ? $migration : new $class($this->client);
     }
 
     private function generateMigrationClassName(

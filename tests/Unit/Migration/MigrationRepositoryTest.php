@@ -189,19 +189,24 @@ final class MigrationRepositoryTest extends AbstractTestCase
 
     /**
      * `select_sequential_consistency` caps a read at the quorum-committed point but
-     * never waits for the connected replica to get there, so reads of the registry
-     * drain the replication queue first — once per instance.
+     * never waits for the connected replica to get there, so every read of the registry
+     * drains the replication queue first. Per read, not once per instance: a repository
+     * that outlives one migrate run would otherwise carry a stale belief that it has
+     * already caught up.
      */
-    public function testReadsCatchTheReplicaUpOnce(): void
+    public function testEveryReadCatchesTheReplicaUp(): void
     {
         $repository = $this->repository($this->replicatedTopology());
 
         $repository->all();
         $repository->latest();
 
-        self::assertCount(1, $this->writes);
-        self::assertSame('SYSTEM SYNC REPLICA {table:Identifier}', $this->writes[0]['sql']);
-        self::assertSame(['table' => 'migrations'], $this->writes[0]['bindings']);
+        self::assertCount(2, $this->writes);
+
+        foreach ($this->writes as $write) {
+            self::assertSame('SYSTEM SYNC REPLICA {table:Identifier}', $write['sql']);
+            self::assertSame(['table' => 'migrations'], $write['bindings']);
+        }
     }
 
     public function testReadsDoNotCatchUpOnANonReplicatedTopology(): void

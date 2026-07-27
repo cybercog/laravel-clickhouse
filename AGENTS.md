@@ -41,8 +41,9 @@ CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:22.8-alpine docker compose up -d -
 
 ### Namespace: `Cog\Laravel\Clickhouse\` → `src/`
 
-**Entry point:** `ClickhouseServiceProvider` registers three singletons:
+**Entry point:** `ClickhouseServiceProvider` registers four singletons:
 - `ClickHouseDB\Client` — configured ClickHouse client (via `ClickhouseClientFactory`)
+- `AbstractClickhouseMigration::CLIENT` — the same client on the migration timeout
 - `Migrator` — executes migrations, tracks state via `MigrationRepository`
 - `MigrationCreator` — generates migration files from stub
 
@@ -59,7 +60,9 @@ CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:22.8-alpine docker compose up -d -
 
 ### Configuration
 
-Published to `config/clickhouse.php`. Connection settings read from env vars: `CLICKHOUSE_HOST`, `CLICKHOUSE_PORT`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE`, `CLICKHOUSE_MIGRATION_TABLE`.
+Published to `config/clickhouse.php`. Connection settings read from env vars: `CLICKHOUSE_HOST`, `CLICKHOUSE_PORT`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DATABASE`, `CLICKHOUSE_QUERY_TIMEOUT`, `CLICKHOUSE_MIGRATION_TABLE`.
+
+Two execution timeouts, because `options.timeout` is sent as `max_execution_time` on every request: `CLICKHOUSE_QUERY_TIMEOUT` (1s) for the application client bound to `ClickHouseDB\Client`, and `CLICKHOUSE_MIGRATION_TIMEOUT` (180s) for the client bound to `AbstractClickhouseMigration::CLIENT`, which migrations resolve for themselves.
 
 ## Testing
 

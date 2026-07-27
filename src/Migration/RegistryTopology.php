@@ -15,8 +15,6 @@ namespace Cog\Laravel\Clickhouse\Migration;
 
 use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 
-use function is_string;
-
 /**
  * Where the migration registry lives and how it stays consistent.
  *
@@ -25,7 +23,7 @@ use function is_string;
  */
 final class RegistryTopology
 {
-    public const DEFAULT_REPLICA_PATH = '/clickhouse/tables/{database}/{table}';
+    public const DEFAULT_REPLICA_PATH_PREFIX = '/clickhouse/tables';
 
     public const DEFAULT_REPLICA_NAME = '{replica}';
 
@@ -41,7 +39,7 @@ final class RegistryTopology
         private readonly string $database,
         private readonly ?string $cluster = null,
         private readonly bool $isReplicated = false,
-        private readonly string $replicaPath = self::DEFAULT_REPLICA_PATH,
+        private readonly string $replicaPathPrefix = self::DEFAULT_REPLICA_PATH_PREFIX,
         private readonly string $replicaName = self::DEFAULT_REPLICA_NAME,
     ) {
         Identifier::ensureValid($table, 'migration registry table name');
@@ -61,20 +59,17 @@ final class RegistryTopology
         }
 
         if ($isReplicated) {
-            self::ensureSafeLiteral($replicaPath, 'replica path');
+            self::ensureSafeLiteral($replicaPathPrefix, 'replica path prefix');
             self::ensureSafeLiteral($replicaName, 'replica name');
-
-            if ($cluster !== null && str_contains($replicaPath, '{shard}')) {
-                throw new ClickhouseConfigException(
-                    'The migration registry replica path must not contain the {shard} macro: '
-                    . "'{$replicaPath}'. It would create one replication group per shard, so each shard "
-                    . 'would keep its own view of which migrations have been applied.',
-                );
-            }
+            self::ensureNoMacro($replicaPathPrefix);
         }
     }
 
     /**
+     * The cluster name is trimmed, and a blank one is no cluster at all rather than a
+     * cluster named "" — `env('CLICKHOUSE_MIGRATION_CLUSTER')` on an empty `.env` entry
+     * yields `''`. `Identifier::onClusterClause()` reads the same value the same way.
+     *
      * @param array<string, mixed> $config The `clickhouse.migrations` config section.
      *
      * @throws ClickhouseConfigException
@@ -85,16 +80,16 @@ final class RegistryTopology
     ): self {
         $cluster = $config['cluster'] ?? null;
 
-        if (is_string($cluster) && trim($cluster) === '') {
-            $cluster = null;
+        if ($cluster !== null) {
+            $cluster = trim((string) $cluster);
         }
 
         return new self(
             table: (string) ($config['table'] ?? 'migrations'),
             database: $database,
-            cluster: $cluster === null ? null : (string) $cluster,
+            cluster: $cluster === '' ? null : $cluster,
             isReplicated: (bool) ($config['replicated'] ?? false),
-            replicaPath: (string) ($config['replica_path'] ?? self::DEFAULT_REPLICA_PATH),
+            replicaPathPrefix: (string) ($config['replica_path_prefix'] ?? self::DEFAULT_REPLICA_PATH_PREFIX),
             replicaName: (string) ($config['replica_name'] ?? self::DEFAULT_REPLICA_NAME),
         );
     }
@@ -127,10 +122,11 @@ final class RegistryTopology
     /**
      * The engine with its arguments, as `CREATE TABLE` takes it.
      *
-     * `{database}` and `{table}` are substituted here; every other brace token is
-     * left untouched so that ClickHouse expands it as a macro on each node. That is
-     * also why the path and the name are interpolated rather than bound — ClickHouse
-     * does not expand macros passed through query parameters.
+     * The replica path is fully resolved here — the prefix is a literal, and the
+     * database and the table are appended by this package — so only the replica name
+     * still holds macros for ClickHouse to expand on each node. That is why the name
+     * is interpolated rather than bound: ClickHouse does not expand macros passed
+     * through query parameters.
      */
     public function getEngineDefinition(): string
     {
@@ -138,12 +134,11 @@ final class RegistryTopology
             return self::ENGINE;
         }
 
-        $replicaPath = strtr(
-            $this->replicaPath,
-            [
-                '{database}' => $this->database,
-                '{table}' => $this->table,
-            ],
+        $replicaPath = sprintf(
+            '%s/%s/%s',
+            rtrim($this->replicaPathPrefix, '/'),
+            $this->database,
+            $this->table,
         );
 
         return sprintf(
@@ -181,5 +176,31 @@ final class RegistryTopology
                 "The migration registry {$subject} '{$literal}' contains a quote, a backslash or a line break.",
             );
         }
+    }
+
+    /**
+     * The registry is replicated, never sharded: every host must resolve the same
+     * replica path, so the prefix has to be a literal.
+     *
+     * Naming the macros that differ per host would be a blocklist, and macro names are
+     * the operator's to choose — `{shard}` is only the obvious one, `{layer}` or any
+     * custom name does the same damage. Rejecting all of them is the only complete
+     * rule, and it costs nothing: the environment can be spelled out in the prefix.
+     *
+     * @throws ClickhouseConfigException
+     */
+    private static function ensureNoMacro(
+        string $replicaPathPrefix,
+    ): void {
+        if (preg_match('/[{}]/', $replicaPathPrefix) !== 1) {
+            return;
+        }
+
+        throw new ClickhouseConfigException(
+            "The migration registry replica path prefix '{$replicaPathPrefix}' contains a macro. "
+            . 'A macro that resolves differently on different hosts — {shard}, or any custom one — '
+            . 'puts them in separate replication groups, so each keeps its own view of which '
+            . 'migrations have been applied. Write the value out literally instead.',
+        );
     }
 }

@@ -29,8 +29,6 @@ use Cog\Laravel\Clickhouse\Exception\ClickhouseRegistryEngineMismatchException;
  */
 final class MigrationRepository
 {
-    private bool $isReplicaSynced = false;
-
     public function __construct(
         private readonly Client $client,
         private readonly RegistryTopology $topology,
@@ -262,12 +260,14 @@ final class MigrationRepository
      * fetched that part yet simply returns fewer rows, with no error. Only
      * `SYSTEM SYNC REPLICA` closes the gap, by draining the replication queue.
      *
-     * Once per instance is enough: a repository lives for a single migrate run, and
-     * whatever that run writes afterwards is written through this very connection.
+     * Every read pays for it, rather than the first one per instance. A migrate run
+     * reads the registry twice, and the second call returns straight away against a
+     * queue the first one already drained — cheaper than owning a flag whose
+     * correctness depends on how long the repository happens to live.
      */
     private function syncReplica(): void
     {
-        if ($this->isReplicaSynced || $this->topology->isReplicated() === false) {
+        if ($this->topology->isReplicated() === false) {
             return;
         }
 
@@ -275,8 +275,6 @@ final class MigrationRepository
             'SYSTEM SYNC REPLICA {table:Identifier}',
             $this->tableBinding(),
         );
-
-        $this->isReplicaSynced = true;
     }
 
     /**

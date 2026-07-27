@@ -17,6 +17,7 @@ use ClickHouseDB\Client;
 use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
 use Cog\Laravel\Clickhouse\Migration\AbstractClickhouseMigration;
 use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class AbstractClickhouseMigrationTest extends AbstractTestCase
 {
@@ -38,16 +39,40 @@ final class AbstractClickhouseMigrationTest extends AbstractTestCase
      * `env('CLICKHOUSE_MIGRATION_CLUSTER')` on an empty `.env` entry yields `''`,
      * which must not be treated as a cluster named "".
      */
-    public function testOnClusterTreatsEmptyStringAsAbsent(): void
-    {
-        config(['clickhouse.migrations.cluster' => '']);
+    #[DataProvider('provideBlankClusterNames')]
+    public function testOnClusterTreatsABlankNameAsAbsent(
+        string $cluster,
+    ): void {
+        config(['clickhouse.migrations.cluster' => $cluster]);
 
         self::assertSame('', $this->migration()->onCluster());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function provideBlankClusterNames(): array
+    {
+        return [
+            'empty' => [''],
+            'spaces' => ['   '],
+        ];
     }
 
     public function testOnClusterIsQuotedWithCluster(): void
     {
         config(['clickhouse.migrations.cluster' => 'main']);
+
+        self::assertSame('ON CLUSTER `main`', $this->migration()->onCluster());
+    }
+
+    /**
+     * Padding is insignificant wherever a blank name is: a quoted `.env` value naming
+     * the cluster it looks like must not fail identifier validation on its whitespace.
+     */
+    public function testOnClusterTrimsThePaddedName(): void
+    {
+        config(['clickhouse.migrations.cluster' => ' main ']);
 
         self::assertSame('ON CLUSTER `main`', $this->migration()->onCluster());
     }

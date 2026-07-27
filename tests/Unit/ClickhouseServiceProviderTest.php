@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace Cog\Tests\Laravel\Clickhouse\Unit;
 
+use ClickHouseDB\Client as ClickhouseClient;
 use Cog\Laravel\Clickhouse\Exception\ClickhouseConfigException;
+use Cog\Laravel\Clickhouse\Migration\AbstractClickhouseMigration;
 use Cog\Laravel\Clickhouse\Migration\Migrator;
 use Cog\Tests\Laravel\Clickhouse\AbstractTestCase;
 
@@ -28,20 +30,49 @@ final class ClickhouseServiceProviderTest extends AbstractTestCase
         self::assertNull(config('clickhouse.migrations.cluster'));
         self::assertFalse(config('clickhouse.migrations.replicated'));
         self::assertSame(
-            '/clickhouse/tables/{database}/{table}',
-            config('clickhouse.migrations.replica_path'),
+            '/clickhouse/tables',
+            config('clickhouse.migrations.replica_path_prefix'),
         );
         self::assertSame('{replica}', config('clickhouse.migrations.replica_name'));
+    }
+
+    public function testShippedConfigDefaultsBothTimeouts(): void
+    {
+        self::assertSame(1, config('clickhouse.connection.options.timeout'));
+        self::assertSame(180, config('clickhouse.migrations.timeout'));
     }
 
     /**
      * `connection.options.timeout` is `max_execution_time` on every request. At the
      * shipped value of 1 second an `ON CLUSTER` DDL — which waits for every host up
-     * to `distributed_ddl_task_timeout` (180s) — cannot complete.
+     * to `distributed_ddl_task_timeout` (180s) — cannot complete, so migrations get
+     * a client of their own.
      */
-    public function testMigrationStatementsGetTheirOwnExecutionTimeout(): void
+    public function testMigrationClientCarriesTheMigrationTimeout(): void
     {
-        self::assertGreaterThanOrEqual(60, config('clickhouse.migrations.timeout'));
+        $applicationClient = $this->app->get(ClickhouseClient::class);
+        $migrationClient = $this->app->get(AbstractClickhouseMigration::CLIENT);
+
+        self::assertNotSame($applicationClient, $migrationClient);
+        self::assertSame(1, $applicationClient->getTimeout());
+        self::assertSame(180, $migrationClient->getTimeout());
+    }
+
+    /**
+     * A migration file returns an anonymous class it constructs itself, so nothing
+     * can hand it a client — it has to reach for the right one on its own, whether
+     * the migrator built it or not.
+     */
+    public function testMigrationBuildsItselfWithTheMigrationClient(): void
+    {
+        $migration = new class extends AbstractClickhouseMigration {
+            public function up(): void {}
+        };
+
+        self::assertSame(
+            $this->app->get(AbstractClickhouseMigration::CLIENT),
+            $migration->getClickhouseClient(),
+        );
     }
 
     public function testMigratorResolvesWithDefaultConfig(): void

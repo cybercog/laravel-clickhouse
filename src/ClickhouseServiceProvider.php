@@ -17,6 +17,7 @@ use ClickHouseDB\Client as ClickhouseClient;
 use Cog\Laravel\Clickhouse\ConsoleCommand\ClickhouseMigrateCommand;
 use Cog\Laravel\Clickhouse\ConsoleCommand\MakeClickhouseMigrationCommand;
 use Cog\Laravel\Clickhouse\Factory\ClickhouseClientFactory;
+use Cog\Laravel\Clickhouse\Migration\AbstractClickhouseMigration;
 use Cog\Laravel\Clickhouse\Migration\MigrationCreator;
 use Cog\Laravel\Clickhouse\Migration\MigrationRepository;
 use Cog\Laravel\Clickhouse\Migration\Migrator;
@@ -49,13 +50,36 @@ final class ClickhouseServiceProvider extends ServiceProvider
             },
         );
 
-        $this->app->bind(
+        /*
+         * `connection.options.timeout` reaches the server as `max_execution_time` on
+         * every request. Migrations — an `ON CLUSTER` statement above all, which waits on
+         * `distributed_ddl_task_timeout` — need their own, and the application-facing
+         * client must keep the value it was tuned with.
+         */
+        $this->app->singleton(
+            AbstractClickhouseMigration::CLIENT,
+            static function (Application $app): ClickhouseClient {
+                $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
+
+                $connectionConfig = $appConfigRepository->get('clickhouse.connection', []);
+                $connectionConfig['options'] ??= [];
+                $connectionConfig['options']['timeout'] = (int) (
+                    $appConfigRepository->get('clickhouse.migrations.timeout') ?? self::DEFAULT_MIGRATION_TIMEOUT
+                );
+
+                $clickhouseClientFactory = new ClickhouseClientFactory($connectionConfig);
+
+                return $clickhouseClientFactory->create();
+            },
+        );
+
+        $this->app->singleton(
             Migrator::class,
             static function (Application $app): Migrator {
                 $appConfigRepository = $app->get(AppConfigRepositoryInterface::class);
                 $filesystem = $app->get(Filesystem::class);
 
-                $client = self::createMigrationClient($appConfigRepository);
+                $client = $app->get(AbstractClickhouseMigration::CLIENT);
 
                 $topology = RegistryTopology::fromConfig(
                     $appConfigRepository->get('clickhouse.migrations', []),
@@ -86,26 +110,6 @@ final class ClickhouseServiceProvider extends ServiceProvider
         $this->configure();
         $this->registerConsoleCommands();
         $this->registerPublishes();
-    }
-
-    /**
-     * `connection.options.timeout` reaches the server as `max_execution_time` on
-     * every request. Migrations — an `ON CLUSTER` statement above all, which waits on
-     * `distributed_ddl_task_timeout` — need their own, and the application-facing
-     * client must keep the value it was tuned with.
-     */
-    private static function createMigrationClient(
-        AppConfigRepositoryInterface $appConfigRepository,
-    ): ClickhouseClient {
-        $connectionConfig = $appConfigRepository->get('clickhouse.connection', []);
-        $connectionConfig['options'] ??= [];
-        $connectionConfig['options']['timeout'] = (int) (
-            $appConfigRepository->get('clickhouse.migrations.timeout') ?? self::DEFAULT_MIGRATION_TIMEOUT
-        );
-
-        $clickhouseClientFactory = new ClickhouseClientFactory($connectionConfig);
-
-        return $clickhouseClientFactory->create();
     }
 
     private function configure(): void

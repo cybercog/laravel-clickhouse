@@ -30,7 +30,12 @@ return [
         'password' => env('CLICKHOUSE_PASSWORD', ''),
         'options' => [
             'database' => env('CLICKHOUSE_DATABASE', 'default'),
-            'timeout' => 1,
+
+            /*
+            | Sent to the server as `max_execution_time` on every request the application
+            | makes. Migrations do not run under this cap — see `migrations.timeout`.
+            */
+            'timeout' => (int) env('CLICKHOUSE_QUERY_TIMEOUT', 1),
             'connectTimeOut' => 2,
         ],
     ],
@@ -46,10 +51,10 @@ return [
         'path' => database_path('clickhouse-migrations'),
 
         /*
-        | Migrations run under their own execution timeout. `connection.options.timeout`
-        | is sent as `max_execution_time` on every request and is tuned for application
-        | queries, while an `ON CLUSTER` statement waits for every host of the cluster up
-        | to `distributed_ddl_task_timeout` (180 seconds by default).
+        | Migrations run on their own client, under this execution timeout instead of
+        | `CLICKHOUSE_QUERY_TIMEOUT`, which is tuned for application queries. An
+        | `ON CLUSTER` statement waits for every host of the cluster up to
+        | `distributed_ddl_task_timeout` (180 seconds by default).
         */
         'timeout' => (int) env('CLICKHOUSE_MIGRATION_TIMEOUT', 180),
 
@@ -59,15 +64,19 @@ return [
         | `ON CLUSTER` registry on a non-replicated engine is one independent table per
         | shard, and they diverge from the first migration onwards.
         |
-        | `replica_path` must not contain the {shard} macro on a cluster, so that every
-        | host joins a single replication group. {database} and {table} are substituted
-        | by this package; every other macro is expanded by ClickHouse on each node.
-        | `replica_name` must be unique cluster-wide — set it to something like
-        | '{shard}-{replica}' when {replica} repeats across shards.
+        | The replica path is `replica_path_prefix` followed by the database and the
+        | table. The prefix must hold no macro: the registry is replicated and never
+        | sharded, so every host has to resolve the same path. Change it only to keep
+        | several installations apart in a shared Keeper — and spell the value out,
+        | '/clickhouse/staging/tables' rather than a macro.
+        |
+        | `replica_name`, in contrast, is expanded by ClickHouse on each node and must
+        | be unique cluster-wide — set it to something like '{shard}-{replica}' when
+        | {replica} repeats across shards.
         */
         'cluster' => env('CLICKHOUSE_MIGRATION_CLUSTER'),
         'replicated' => (bool) env('CLICKHOUSE_MIGRATION_REPLICATED', false),
-        'replica_path' => env('CLICKHOUSE_MIGRATION_REPLICA_PATH', '/clickhouse/tables/{database}/{table}'),
+        'replica_path_prefix' => env('CLICKHOUSE_MIGRATION_REPLICA_PATH_PREFIX', '/clickhouse/tables'),
         'replica_name' => env('CLICKHOUSE_MIGRATION_REPLICA_NAME', '{replica}'),
     ],
 ];

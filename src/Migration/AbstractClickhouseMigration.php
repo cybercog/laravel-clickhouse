@@ -19,6 +19,16 @@ use function config;
 
 abstract class AbstractClickhouseMigration
 {
+    /**
+     * Container key of the client migrations run on.
+     *
+     * A migration file returns an anonymous class it constructs itself, so nothing can
+     * hand it a client. Resolving this key rather than `ClickHouseDB\Client` is what
+     * keeps a migration off the application-facing query timeout — see
+     * `clickhouse.migrations.timeout`.
+     */
+    public const CLIENT = 'clickhouse.migration-client';
+
     protected Client $clickhouseClient;
     protected string $databaseName;
 
@@ -26,23 +36,13 @@ abstract class AbstractClickhouseMigration
         ?Client $clickhouseClient = null,
         ?string $databaseName = null,
     ) {
-        $this->clickhouseClient = $clickhouseClient ?? app(Client::class);
+        $this->clickhouseClient = $clickhouseClient ?? app(self::CLIENT);
         $this->databaseName = $databaseName ?? config('clickhouse.connection.options.database');
     }
 
     public function getClickhouseClient(): Client
     {
         return $this->clickhouseClient;
-    }
-
-    /**
-     * Migrations run on the migrator's own client, which is not capped by the
-     * application-facing query timeout.
-     */
-    public function setClickhouseClient(
-        Client $clickhouseClient,
-    ): void {
-        $this->clickhouseClient = $clickhouseClient;
     }
 
     public function getDatabaseName(): string

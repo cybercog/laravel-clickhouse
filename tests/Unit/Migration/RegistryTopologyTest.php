@@ -71,20 +71,35 @@ final class RegistryTopologyTest extends AbstractTestCase
     }
 
     /**
-     * `{database}` and `{table}` are substituted here; every other brace token is left
-     * for ClickHouse to expand as a macro on each node.
+     * The path is the prefix plus the database and the table, so nothing in it is left
+     * for ClickHouse to expand.
      */
-    public function testEngineDefinitionSubstitutesDatabaseAndTableOnly(): void
+    public function testEngineDefinitionBuildsThePathFromThePrefix(): void
     {
         $topology = new RegistryTopology(
             table: 'migrations',
             database: 'analytics',
             isReplicated: true,
-            replicaPath: '/clickhouse/{layer}/tables/{database}/{table}',
+            replicaPathPrefix: '/clickhouse/staging/tables',
         );
 
         self::assertSame(
-            "ReplicatedReplacingMergeTree('/clickhouse/{layer}/tables/analytics/migrations', '{replica}')",
+            "ReplicatedReplacingMergeTree('/clickhouse/staging/tables/analytics/migrations', '{replica}')",
+            $topology->getEngineDefinition(),
+        );
+    }
+
+    public function testEngineDefinitionToleratesATrailingSlashInThePrefix(): void
+    {
+        $topology = new RegistryTopology(
+            table: 'migrations',
+            database: 'analytics',
+            isReplicated: true,
+            replicaPathPrefix: '/clickhouse/tables/',
+        );
+
+        self::assertStringContainsString(
+            "'/clickhouse/tables/analytics/migrations'",
             $topology->getEngineDefinition(),
         );
     }
@@ -118,35 +133,56 @@ final class RegistryTopologyTest extends AbstractTestCase
     }
 
     /**
-     * D1: a `{shard}` in the path yields one registry per shard — the original bug.
+     * D1: a macro that resolves differently per host yields one registry per group of
+     * hosts — the original bug. `{shard}` is only the obvious spelling of it, which is
+     * why the rule rejects every macro rather than naming any.
      */
-    public function testShardMacroInReplicaPathIsRejectedForClusteredTopology(): void
-    {
+    #[DataProvider('provideMacroPrefixes')]
+    public function testMacroInReplicaPathPrefixIsRejected(
+        string $prefix,
+    ): void {
         $this->expectException(ClickhouseConfigException::class);
-        $this->expectExceptionMessageMatches('/\{shard\}/');
+        $this->expectExceptionMessageMatches('/macro/i');
 
         new RegistryTopology(
             table: 'migrations',
             database: 'analytics',
             cluster: 'main',
             isReplicated: true,
-            replicaPath: '/clickhouse/tables/{shard}/{database}/{table}',
+            replicaPathPrefix: $prefix,
         );
     }
 
-    public function testShardMacroInReplicaPathIsAllowedWithoutCluster(): void
-    {
-        $topology = new RegistryTopology(
+    /**
+     * Off a cluster the damage is the same — a replicated registry still has to be one
+     * replication group — so the rule does not depend on `cluster` being set.
+     */
+    #[DataProvider('provideMacroPrefixes')]
+    public function testMacroInReplicaPathPrefixIsRejectedWithoutCluster(
+        string $prefix,
+    ): void {
+        $this->expectException(ClickhouseConfigException::class);
+
+        new RegistryTopology(
             table: 'migrations',
             database: 'analytics',
             isReplicated: true,
-            replicaPath: '/clickhouse/tables/{shard}/{database}/{table}',
+            replicaPathPrefix: $prefix,
         );
+    }
 
-        self::assertStringContainsString(
-            "'/clickhouse/tables/{shard}/analytics/migrations'",
-            $topology->getEngineDefinition(),
-        );
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function provideMacroPrefixes(): array
+    {
+        return [
+            'shard' => ['/clickhouse/tables/{shard}'],
+            'layer' => ['/clickhouse/{layer}/tables'],
+            'custom' => ['/clickhouse/{shard_group}/tables'],
+            'replica' => ['/clickhouse/tables/{replica}'],
+            'opening brace alone' => ['/clickhouse/tables/{'],
+        ];
     }
 
     #[DataProvider('provideInvalidIdentifiers')]
@@ -211,7 +247,7 @@ final class RegistryTopologyTest extends AbstractTestCase
      * 24.8, ClickHouse does not expand macros passed through query parameters.
      */
     #[DataProvider('provideUnsafeLiterals')]
-    public function testUnsafeReplicaPathIsRejected(
+    public function testUnsafeReplicaPathPrefixIsRejected(
         string $literal,
     ): void {
         $this->expectException(ClickhouseConfigException::class);
@@ -220,7 +256,7 @@ final class RegistryTopologyTest extends AbstractTestCase
             table: 'migrations',
             database: 'analytics',
             isReplicated: true,
-            replicaPath: $literal,
+            replicaPathPrefix: $literal,
         );
     }
 
@@ -275,7 +311,7 @@ final class RegistryTopologyTest extends AbstractTestCase
                 'table' => 'migrations',
                 'cluster' => 'main',
                 'replicated' => true,
-                'replica_path' => '/clickhouse/tables/{database}/{table}',
+                'replica_path_prefix' => '/clickhouse/staging/tables',
                 'replica_name' => '{shard}-{replica}',
             ],
             'analytics',
@@ -284,7 +320,7 @@ final class RegistryTopologyTest extends AbstractTestCase
         self::assertSame('ON CLUSTER `main`', $topology->getOnClusterClause());
         self::assertTrue($topology->isReplicated());
         self::assertSame(
-            "ReplicatedReplacingMergeTree('/clickhouse/tables/analytics/migrations', '{shard}-{replica}')",
+            "ReplicatedReplacingMergeTree('/clickhouse/staging/tables/analytics/migrations', '{shard}-{replica}')",
             $topology->getEngineDefinition(),
         );
     }
@@ -293,16 +329,47 @@ final class RegistryTopologyTest extends AbstractTestCase
      * `env('CLICKHOUSE_MIGRATION_CLUSTER')` on an empty `.env` entry yields `''`,
      * which must not be treated as a cluster named "".
      */
-    public function testFromConfigTreatsEmptyClusterAsAbsent(): void
-    {
+    #[DataProvider('provideBlankClusterNames')]
+    public function testFromConfigTreatsABlankClusterAsAbsent(
+        string $cluster,
+    ): void {
         $topology = RegistryTopology::fromConfig(
             [
                 'table' => 'migrations',
-                'cluster' => '',
+                'cluster' => $cluster,
             ],
             'analytics',
         );
 
         self::assertSame('', $topology->getOnClusterClause());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function provideBlankClusterNames(): array
+    {
+        return [
+            'empty' => [''],
+            'spaces' => ['   '],
+        ];
+    }
+
+    /**
+     * Padding is insignificant wherever a blank name is, so a quoted `.env` value names
+     * the cluster it looks like instead of failing identifier validation on whitespace.
+     */
+    public function testFromConfigTrimsThePaddedClusterName(): void
+    {
+        $topology = RegistryTopology::fromConfig(
+            [
+                'table' => 'migrations',
+                'cluster' => ' main ',
+                'replicated' => true,
+            ],
+            'analytics',
+        );
+
+        self::assertSame('ON CLUSTER `main`', $topology->getOnClusterClause());
     }
 }

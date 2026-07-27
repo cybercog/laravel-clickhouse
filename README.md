@@ -132,14 +132,16 @@ CLICKHOUSE_MIGRATION_REPLICATED=true
 The registry then becomes a `ReplicatedReplacingMergeTree` created `ON CLUSTER`, and
 `clickhouse:migrate` is safe to run from any node.
 
-Two rules the configuration cannot infer for you:
+One rule the configuration cannot infer for you: **`CLICKHOUSE_MIGRATION_REPLICA_NAME` must be
+unique cluster-wide.** It defaults to the `{replica}` macro. If `{replica}` repeats across shards in
+your `macros.xml`, set it to `{shard}-{replica}` — two nodes claiming one replica fail with
+`REPLICA_ALREADY_EXISTS`.
 
-- **`CLICKHOUSE_MIGRATION_REPLICA_NAME` must be unique cluster-wide.** It defaults to the
-  `{replica}` macro. If `{replica}` repeats across shards in your `macros.xml`, set it to
-  `{shard}-{replica}` — two nodes claiming one replica fail with `REPLICA_ALREADY_EXISTS`.
-- **`CLICKHOUSE_MIGRATION_REPLICA_PATH` must not contain `{shard}`.** The registry is replicated,
-  never sharded: a `{shard}` in the path gives each shard its own history. This one is rejected for
-  you.
+The replica path is `CLICKHOUSE_MIGRATION_REPLICA_PATH_PREFIX` (`/clickhouse/tables`) followed by
+your database and table name. Change the prefix only to keep several installations apart in a shared
+Keeper, and write the value out literally — a macro in the prefix is rejected, because one that
+resolves differently per host would split the registry into a history per group of hosts, which is
+the bug cluster mode exists to fix.
 
 Migrations themselves opt into `ON CLUSTER` with `onCluster()`, which returns the whole clause and
 collapses to nothing where no cluster is configured, so one file serves both deployments:

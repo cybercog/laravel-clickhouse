@@ -30,17 +30,24 @@ depends on, and the measured capability matrix behind it.
 **The registry is described by explicit configuration, and every statement it emits is derived from
 that description rather than hardcoded.**
 
-`clickhouse.migrations` gains `cluster`, `replicated`, `replica_path`, `replica_name` and `timeout`.
+`clickhouse.migrations` gains `cluster`, `replicated`, `replica_path_prefix`, `replica_name` and
+`timeout`.
 The defaults reproduce today's single-node behaviour exactly, so an existing installation sees no
 change. `RegistryTopology` holds and validates that description; `MigrationRepository` turns it into
 statements and runs them.
 
 ### D1 — The registry is replicated, never sharded
 
-Its ZooKeeper path deliberately carries no `{shard}` macro, so every node joins one replication
-group and sees the same rows. This is the opposite of the advice for data tables, and it is the
-point: the registry is coordination state, not data. Sharding it would give each shard a partial
-history — the bug being fixed, reintroduced with more machinery.
+Its ZooKeeper path carries no macro at all, so every node joins one replication group and sees the
+same rows. This is the opposite of the advice for data tables, and it is the point: the registry is
+coordination state, not data. Sharding it would give each shard a partial history — the bug being
+fixed, reintroduced with more machinery.
+
+The path is not a template but `replica_path_prefix` — a literal — with the database and the table
+appended by this package. Rejecting `{shard}` by name would be a blocklist, and macro names belong
+to the operator: `{layer}`, or any custom name that resolves per shard, splits the registry exactly
+as `{shard}` does while sailing past a check that names one macro. An operator with a shared Keeper
+still gets what the setting exists for by spelling the value out — `/clickhouse/staging/tables`.
 
 For the same reason `cluster` without `replicated` is rejected at wiring time: `ON CLUSTER` over
 non-replicated tables creates N independent registries and swallows the inconsistency.
@@ -53,10 +60,15 @@ Every registry read uses `FINAL`. In replicated mode the `INSERT` also carries
 That is necessary and **not sufficient**. `select_sequential_consistency` caps a read at the last
 quorum-committed part; it does not wait for the connected replica to reach it. A replica that has
 not fetched the part yet returns *fewer* rows, with no error — precisely the "second run re-applies
-migrations" failure the setting looks like it prevents. So each `MigrationRepository` issues
-`SYSTEM SYNC REPLICA` once, before its first read of the registry. `exists()` and `getEngine()` are
-exempt: both answer questions about the connected node alone and must work before the registry
-exists.
+migrations" failure the setting looks like it prevents. So every registry read is preceded by
+`SYSTEM SYNC REPLICA`. `exists()` and `getEngine()` are exempt: both answer questions about the
+connected node alone and must work before the registry exists.
+
+Doing it per read rather than once per repository is deliberate. A flag makes correctness depend on
+how long the object lives — under Octane or a queue worker a second migrate run would reuse a
+repository that believes it has already synced — and buys one saved round trip on a run that reads
+the registry twice, where the second call returns immediately against a queue the first one drained.
+`Migrator` is therefore an ordinary `singleton`, with no state to make that binding a lie.
 
 The quorum is not configurable. The only value an operator would reach for is `0`, and `0` turns
 `select_sequential_consistency` into a silent no-op — a setting that looks like a guarantee and
@@ -71,8 +83,9 @@ server as `param_*`. The `CREATE TABLE` is the exception, and only where the ser
 `REPLICA_ALREADY_EXISTS` with two nodes claiming one replica.
 
 The cluster name is validated as an identifier (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and backtick-quoted;
-the ZooKeeper path and replica name are rejected if they contain a quote, a backslash or a newline,
-so neither can close the string literal it sits in.
+the ZooKeeper path prefix and the replica name are rejected if they contain a quote, a backslash or
+a newline, so neither can close the string literal it sits in. The database and the table appended
+to the prefix are identifiers, already validated as such.
 
 ### D4 — The create is unconditional and idempotent
 
@@ -109,8 +122,15 @@ so a `{database}` binding silently eats the ClickHouse `{database}` macro in a r
 `connection.options.timeout` reaches the server as `max_execution_time` on *every* request, so an
 application tuned to a 1-second cap cannot run an `ON CLUSTER` statement at all — that DDL waits on
 `distributed_ddl_task_timeout`, 180 seconds by default. The driver offers no per-request settings,
-so the migrator builds its own client from `migrations.timeout` (default 180) and leaves the
-application-facing client exactly as configured.
+so the two caps become two settings — `CLICKHOUSE_QUERY_TIMEOUT` and `CLICKHOUSE_MIGRATION_TIMEOUT`
+— and two clients. The application-facing client stays exactly as configured.
+
+The second client is registered under `AbstractClickhouseMigration::CLIENT`, and the migration base
+class resolves that key when its constructor is handed nothing. That is the only place it can be
+resolved: a migration file returns an anonymous class it constructs itself, so the migrator has no
+opportunity to inject anything. Reaching for the right client in the constructor also means a
+migration built outside the migrator is not silently capped at the application timeout, which a
+setter on the migrator's side could not guarantee.
 
 ## Evidence
 
@@ -158,7 +178,7 @@ current release alone:
   behaviour, but they are five more things an operator can get wrong.
 - Cluster mode couples a migrate run to the health of a majority of replicas. That is the intended
   trade-off — it is also a new way for a deploy to block.
-- Every registry read path now pays one `SYSTEM SYNC REPLICA` per run in replicated mode.
+- Every registry read pays a `SYSTEM SYNC REPLICA` in replicated mode.
 - Cluster coverage requires a six-container environment, which is slower than the rest of CI.
 
 **Neutral**
