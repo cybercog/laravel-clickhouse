@@ -33,6 +33,10 @@ return [
             'timeout' => 1,
             'connectTimeOut' => 2,
         ],
+        'settings' => [
+            // ClickHouse session settings
+            // Example: 'allow_experimental_object_type' => 1,
+        ],
     ],
 
     /*

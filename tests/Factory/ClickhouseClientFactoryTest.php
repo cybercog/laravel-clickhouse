@@ -72,4 +72,33 @@ final class ClickhouseClientFactoryTest extends AbstractTestCase
             self::assertSame(ClickhouseConfigException::class, get_class($exception));
         }
     }
+
+    public function testInitializationWithSettings(): void
+    {
+        $clickhouse = new ClickhouseClientFactory(
+            [
+                'host' => 'example.com',
+                'port' => '9000',
+                'username' => 'test_user',
+                'password' => 'secret',
+                'options' => [
+                    'database' => 'test_database',
+                ],
+                'settings' => [
+                    'max_execution_time' => 60,
+                    'allow_experimental_object_type' => 1,
+                ],
+            ]
+        );
+
+        $client = $clickhouse->create();
+
+        self::assertSame('example.com', $client->getConnectHost());
+        self::assertSame('9000', $client->getConnectPort());
+        self::assertSame('test_user', $client->getConnectUsername());
+        self::assertSame('secret', $client->getConnectPassword());
+        self::assertSame('test_database', $client->settings()->getDatabase());
+        self::assertSame(60, $client->settings()->getSetting('max_execution_time'));
+        self::assertSame(1, $client->settings()->getSetting('allow_experimental_object_type'));
+    }
 }
