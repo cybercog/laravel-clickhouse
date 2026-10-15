@@ -67,6 +67,14 @@ final class ClickhouseMigrateCommand extends Command
 
     private function getMigrationsDirectoryPath(): string
     {
+        $path = $this->option('path');
+
+        if ($path !== null) {
+            return $this->option('realpath')
+                ? $path
+                : $this->laravel->basePath($path);
+        }
+
         return $this->appConfig->get('clickhouse.migrations.path');
     }
 }
